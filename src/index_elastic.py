@@ -119,7 +119,6 @@ def eval_queries(queries: Dict[Id, Query], qrel_file_path: str, engine: Engine,
     msearch_body = _msearch_preprocess(query_texts, index, doc_type)
     res = engine.msearch(msearch_body, index)
     res = res["responses"]
-    print('ok')
     total_score, scores = compute_trec_eval(query_ids, qrel_file_path, res, resp_file_path)
     
     for qid in query_ids:
@@ -142,3 +141,4 @@ if __name__ == "__main__":
     tot_score,scores = eval_queries(dico, qrel_file_path="/local/karmim/Stage_M1_RI/data/qrels.robust2004.txt", engine=engine,resp_file_path="/local/karmim/Stage_M1_RI/results/results.txt", index= "robust2004", doc_type= "trec")
     print("ecriture résultats ok")
     print("score MAP :" ,tot_score)
+    
