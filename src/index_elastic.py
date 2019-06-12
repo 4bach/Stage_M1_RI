@@ -13,10 +13,8 @@ from itertools import accumulate
 from typing import List, Dict, Tuple
 import elasticsearch as es
 import json
-import numpy as np
 import pytrec_eval
-
-
+import numpy as np
 
 # Typings
 QueryBody = Dict

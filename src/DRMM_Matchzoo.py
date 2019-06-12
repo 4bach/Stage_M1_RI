@@ -32,7 +32,7 @@ class DRMM_Matchzoo:
         self.CUSTOM_FILTERS = CUSTOM_FILTERS # Liste de fonction de Préprocessing des docs
         self.model = KeyedVectors.load_word2vec_format(embeddings_path + sep + "model.bin", binary=True)
         self.vocabulary = [w for w in self.model.vocab]
-        self.vectorizer = CountVectorizer(analyzer='word', vocabulary=vocabulary, binary=True)
+        self.vectorizer = CountVectorizer(analyzer='word', vocabulary=self.vocabulary, binary=True)
 
 
 
@@ -59,6 +59,23 @@ class DRMM_Matchzoo:
         for i in range(len(id_)):
             self.current_docs[id_[i].text] =  preprocess_string(text_[i].text, self.CUSTOM_FILTERS)[2:]
 
+    def load_relevance(self,file_rel="/local/karmim/Stage_M1_RI/data/qrels.robust2004.txt"):
+        """
+            Chargement du fichier des pertinences pour les requêtes. 
+            Pour chaque paire query/doc on nous dit si pertinent ou non. 
+        """
+        self.paires = {}
+        with open(file_rel,"r") as f:
+            for line in f :
+                l = line.split(' ')
+                self.paires.setdefault(l[0],{})
+                self.paires[l[0]].setdefault('relevant',[])
+                self.paires[l[0]].setdefault('irrelevant',[])
+                if l[-1]=='1':
+                    self.paires[l[0]]['relevant'].append(l[2])
+                else:
+                    self.paires[l[0]]['irrelevant'].append(l[2])
+        return self.paires
 
     def embedding_query(self):
         pass
