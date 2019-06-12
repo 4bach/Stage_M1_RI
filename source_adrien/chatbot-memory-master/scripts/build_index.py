@@ -81,6 +81,7 @@ def parse_all_generator():
     rootDataset= path.expandvars("$DATASET_HOME/as_projet/TREC-ADHOC")
     collections=["FR94", "FT","FB", "LA" ]
     nb_fails = 0
+    docnos, texts, heads = [], [], []
     for root, dirnames, filenames in os.walk(rootDataset):
         for filename in filenames:
             for s in collections:
@@ -89,24 +90,10 @@ def parse_all_generator():
 
                     with open(path_name, 'r', encoding="utf-8", errors="ignore") as f:
                         file_content = f.read()
-                    
-                    # file_content = file_content.replace('\n', ' ').replace('\r', ' ')
-                    # contents = file_content.split("<DOC>")
-                    # contents = [c.strip() for c in contents[1:]]
-                    
-                    # docnos = [re.findall('<DOCNO>(.+?)</DOCNO>', c) for c in contents]
-                    # docnos = map(lambda s: s[0].strip(), docnos)
-
-                    # texts = [re.findall('<TEXT>(.+?)</TEXT>', c) for c in contents]
-                    # texts = map(lambda s: clean(s), texts)
-                    
-                    # bulk_data = bulking(docnos, texts)
-
 
                     soup = BeautifulSoup(file_content, "html.parser")
                     docs = soup.find_all("doc")
                     
-                    docnos, texts, heads = [], [], []
                     for doc in docs:
                         text = doc.text
                         docno = doc.docno.get_text()
@@ -119,10 +106,8 @@ def parse_all_generator():
                         docnos.append(docno)
                         texts.append(text)
 
-                    bulk_data = bulking(docnos, texts, heads)
-
-                    yield bulk_data
     print("Some", nb_fails, "documents didn't have titles")
+    return heads, docnos, texts
 
 
 # With ES server started
