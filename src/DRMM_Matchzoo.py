@@ -8,8 +8,10 @@ from bs4 import BeautifulSoup
 from os import listdir,sep
 from os.path import isfile, join
 from gensim.parsing.preprocessing import preprocess_string,remove_stopwords,strip_numeric, strip_tags, strip_punctuation
-from sklearn.feature_extraction.text import CountVectorizer
-
+from sklearn.metrics.pairwise import cosine_similarity
+#from sklearn.feature_extraction.text import CountVectorizer
+import fasttext # On utilise fastText car il fait automatiquement le prétraitement pour les mots inconnus. 
+ 
 
 def get_all_docs_robust4(folder="/local/karmim/Stage_M1_RI/data/collection"):
     dossier = ['FBIS','FR94','FT','LATIMES']
@@ -32,9 +34,8 @@ class DRMM_Matchzoo:
         self.d_query = {} # Notre dictionnaire de query
         self.all_doc= all_doc # Liste de tout nos documents
         self.CUSTOM_FILTERS = CUSTOM_FILTERS # Liste de fonction de Préprocessing des docs
-        self.model = KeyedVectors.load_word2vec_format(embeddings_path + sep + "model.bin", binary=True)
-        self.vocabulary = [w for w in self.model.vocab]
-        self.vectorizer = CountVectorizer(analyzer='word', vocabulary=self.vocabulary, binary=True)
+        self.model = fasttext.load_model(embeddings_path + sep + "model.bin", binary=True)
+        #self.vocabulary = [w for w in self.model.vocab] #inutile pour le moment. 
         self.max_length_query = 0
         self.current_docs = {}
         self.json_doc_exist = False
@@ -101,13 +102,47 @@ class DRMM_Matchzoo:
                     self.paires[l[0]]['irrelevant'].append(l[2])
         return self.paires
 
-    def embedding_dictionnary(self,dico):
+    def embedding_query(self):
         """
-            Fonction qui pour un dictionnaire avec comme clé l'ID et valeur une liste de mot 
-            retourne un dictionnaire avec une liste des représentations vectorielle des mots (embedding)
-            en utilisant Word2Vec.
+            Fonction qui transforme nos mots du dictionnaire de query par des embeddings (vecteurs).
         """
+        for k in self.d_query:
+            for i in range(len(self.d_query[k])):
+                try:
+                    self.d_query[k][i] = self.model.get_word_vector(self.d_query[k][i])
+                    
+                except KeyError:
+                    pass
+        return self.d_query
 
+    def calcul_interaction(self,query,document,bins_=4,normalize=False):
+        """
+            Fonction qui calcul un histogramme d'une interaction cosinus similarité entre une query et un doc. 
+            Entrée -> Embedding d'une query et d'un document.
+                      bins : Nombre d'intervalles dans l'histogramme.
+                      normalize : Bool pour normaliser l'histogramme. 
+            Sortie -> Renvoie une matrice d'histogramme.
+        """
+        X = []
+        #Embedding du doc 
+        for d in range(len(document)):
+            try:
+                document[d] = self.model.get_word_vector(document[d])
+                    
+            except KeyError:
+                pass
+
+
+        # Calcul de similarité entre doc et query 
+        for q in query:
+            histo = []
+            for d in document:
+                histo.append(cosine_similarity(q, d)[0][0])
+            histo, bin_edges = np.histogram(histo, bins= bins_)
+            if normalize:
+                histo = histo / histo.sum()
+            X.append(histo)
+        return np.array(X)
         
         
 
