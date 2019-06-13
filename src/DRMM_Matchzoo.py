@@ -2,12 +2,14 @@ import numpy as np
 import matchzoo 
 import gensim
 import ast
+import json
 from gensim.models import KeyedVectors
 from bs4 import BeautifulSoup
 from os import listdir,sep
 from os.path import isfile, join
 from gensim.parsing.preprocessing import preprocess_string,remove_stopwords,strip_numeric, strip_tags, strip_punctuation
 from sklearn.feature_extraction.text import CountVectorizer
+
 
 def get_all_docs_robust4(folder="/local/karmim/Stage_M1_RI/data/collection"):
     dossier = ['FBIS','FR94','FT','LATIMES']
@@ -33,7 +35,9 @@ class DRMM_Matchzoo:
         self.model = KeyedVectors.load_word2vec_format(embeddings_path + sep + "model.bin", binary=True)
         self.vocabulary = [w for w in self.model.vocab]
         self.vectorizer = CountVectorizer(analyzer='word', vocabulary=self.vocabulary, binary=True)
-
+        self.max_length_query = 0
+        self.current_docs = {}
+        self.json_doc_exist = False
 
 
 
@@ -47,10 +51,9 @@ class DRMM_Matchzoo:
         f.close()
         for k in self.d_query :
             self.d_query[k]= self.d_query[k][0].split(' ') # On suppr les query langage naturel, et on met la query mot clé sous forme de liste.
-
+        self.max_length_query =  np.max([len(self.d_query[q]) for q in self.d_query])
     
-    def load_docs(self,file_doc):
-        self.current_docs={}
+    def load_doc(self,file_doc):
         with open(file_doc,"r") as f:
             soup = BeautifulSoup(f.read(),"html.parser")
         id_ = soup.find_all('docno')
@@ -58,6 +61,27 @@ class DRMM_Matchzoo:
         
         for i in range(len(id_)):
             self.current_docs[id_[i].text] =  preprocess_string(text_[i].text, self.CUSTOM_FILTERS)[2:]
+        
+        return self.current_docs
+
+
+    def load_all_docs(self,doc_json="../data/object_python/all_docs_preprocess.json"):
+        """
+            Charge tout les docs dans un dico. 
+        """
+        if not self.json_doc_exist:
+            for i in ['FBIS','FR94','FT','LATIMES']:
+                for doc in self.all_doc[i]:
+                    self.load_doc(doc)
+
+            save = json.dumps(self.current_docs)
+            f = open(doc_json,"w")
+            f.write(save)
+            f.close()
+            self.json_doc_exist = True
+
+        else:
+            self.current_docs = json.load(doc_json)
 
     def load_relevance(self,file_rel="/local/karmim/Stage_M1_RI/data/qrels.robust2004.txt"):
         """
@@ -77,7 +101,15 @@ class DRMM_Matchzoo:
                     self.paires[l[0]]['irrelevant'].append(l[2])
         return self.paires
 
-    def embedding_query(self):
-        pass
+    def embedding_dictionnary(self,dico):
+        """
+            Fonction qui pour un dictionnaire avec comme clé l'ID et valeur une liste de mot 
+            retourne un dictionnaire avec une liste des représentations vectorielle des mots (embedding)
+            en utilisant Word2Vec.
+        """
+
+        
+        
+
     
 
