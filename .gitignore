@@ -5,3 +5,6 @@ data
 source_adrien/chatbot-memory-master/src/.vscode/
 osef_perso
 src/.vscode/
+src/trash/
+src/trash
+src/__pycache__/
