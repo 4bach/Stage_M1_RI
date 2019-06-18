@@ -6,6 +6,9 @@ import ast
 import json
 import os
 import pickle
+import time
+import progressbar
+import codecs
 from gensim.models import KeyedVectors
 from bs4 import BeautifulSoup
 from os import listdir,sep
@@ -14,9 +17,6 @@ from gensim.parsing.preprocessing import preprocess_string,remove_stopwords,stri
 from sklearn.metrics.pairwise import cosine_similarity
 #from sklearn.feature_extraction.text import CountVectorizer
 import fasttext # On utilise fastText car il fait automatiquement le prétraitement pour les mots inconnus. 
-
-import codecs
-
 from gensim.models.wrappers import FastText
 
 
@@ -81,13 +81,15 @@ class Dataset:
                 
         return vec
 
-    def get_all_docs_robust4(self,folder="/local/karmim/Stage_M1_RI/data/collection"):
-
-        dossier = ['FBIS','FR94','FT','LATIMES']
-        self.all_doc ={}
-        for d in dossier : 
-            self.all_doc[d] = [f for f in listdir(folder+'/'+d) if isfile(join(folder+'/'+d, f))]
-        return self.all_doc
+    def load_all_path_docs_robust4(self,folder="/local/karmim/Stage_M1_RI/data/collection"):
+        """
+            On charge tout les path des fichiers de la collection robust 4 dans une liste 
+        """
+        
+        self.all_doc =[]
+        for r,_,f in os.walk(folder): 
+            for file in f: 
+                self.all_doc.append(os.path.join(r,file)) 
 
     def load_all_query(self,file_query="/local/karmim/Stage_M1_RI/data/robust2004.txt"):
         """
@@ -102,29 +104,38 @@ class Dataset:
         self.max_length_query =  np.max([len(self.d_query[q]) for q in self.d_query])
         print("query chargé\n")
 
-    def load_doc(self,file_doc):
+    def load_doc(self,file_doc,pre_process=True):
+        """
+            Fonction qui load un fichier file_doc. 
+            pre_process -> Bool qui dit si on effectue le preprocessing ou non. 
+        """
+        cpt_err = 0
         with codecs.open(file_doc,'r',encoding='utf-8',errors='ignore') as f:
             soup = BeautifulSoup(f.read(),"html.parser")
         id_ = soup.find_all('docno')
         text_ = soup.find_all('text')
         
         for i in range(len(id_)):
-            self.docs[id_[i].text] =  preprocess_string(text_[i].text, self.CUSTOM_FILTERS)[2:]
-        
+            try:
+                self.docs[(id_[i].text).strip()] =  preprocess_string(text_[i].text, self.CUSTOM_FILTERS)[2:]
+            except IndexError:
+                cpt_err+=1
+                print("len des id: ",len(id_)," i courant : ",i, " erreur: ",cpt_err)
         return self.docs
 
 
     def load_all_docs(self,doc_json="../data/object_python/all_docs_preprocess.json"):
         """
-            Charge tout les docs dans un dico. 
+            Charge tout les docs dans un dico, puis les enregistre dans un fichier json. 
+            Charge directement le fichier doc_json s'il existe.  
         """
-        self.get_all_docs_robust4()
+        self.load_all_path_docs_robust4()
         exists = os.path.isfile(doc_json)
         if not exists:
-            for i in ['FBIS','FR94','FT','LATIMES']:
-                for doc in self.all_doc[i]:
-                    print("doc",doc)
-                    self.load_doc(self.robust_path+sep+i+sep+doc)
+            for f in self.all_doc:
+                
+                print("f -> ",f)
+                self.load_doc(f)
 
             save = json.dumps(self.docs)
             f = open(doc_json,"w")
@@ -132,8 +143,45 @@ class Dataset:
             f.close()
 
         else:
-            self.docs = json.load(doc_json)
+            print("Chargement du fichier json : ",doc_json," ...")
+            with open(doc_json) as json_file:
+                self.docs = json.load(json_file)
+                
         print("docs chargé\n")
+    
+    def load_docs_per_folder(self,path_json = '/local/karmim/Stage_M1_RI/data/object_python/',path_collection="/local/karmim/Stage_M1_RI/data/collection"):
+        folder = ['FBIS','FR94','FT','LATIMES']
+        self.fbis = {}
+        self.fr94 = {}
+        self.ft = {}
+        self.latimes = {}
+        l = [self.fbis,self.fr94,self.ft,self.latimes]
+        for i,d in enumerate(folder) : 
+            path=path_collection+'/'+d
+
+            self.load_all_path_docs_robust4()
+            exists = os.path.isfile(path_json+d+'.json')
+            if not exists:
+                for r,_,f in os.walk(path): 
+                    for files in f: 
+                        fi = os.path.join(r,files)
+                        
+                        with codecs.open(fi,'r',encoding='utf-8',errors='ignore') as f_:
+                            soup = BeautifulSoup(f_.read(),"html.parser")
+                        docs = soup.find_all('doc')
+                        for d_ in docs :  
+                            l[i][d_.docno.text.strip()]=preprocess_string(d_.text,self.CUSTOM_FILTERS)
+                        
+                save = json.dumps(l[i])
+                f = open(path_json+d+'.json',"w")
+                f.write(save)
+                f.close()
+                print("Le fichier "+path_json+d+'.json a bien été enregistré.')
+
+            else:
+                print("Chargement du fichier json : "+path_json+d+'.json ...')
+                with open(path_json+d+'.json') as json_file:
+                    l[i] = json.load(json_file)
 
     def load_relevance(self,file_rel="/local/karmim/Stage_M1_RI/data/qrels.robust2004.txt"):
         """
@@ -164,7 +212,7 @@ class Dataset:
             histo = []
             for j in document.nonzero()[1]:
                 histo.append(cosine_similarity([self.model_wv.vectors[i]], [self.model_wv.vectors[j]])[0][0])
-            histo, bin_edges = np.histogram(histo, bins=self.intvlsArray)
+            histo, _ = np.histogram(histo, bins=self.intvlsArray)
             if self.normalize:
                 histo = histo / histo.sum()
             X.append(histo)

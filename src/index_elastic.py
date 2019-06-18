@@ -127,7 +127,7 @@ def eval_queries(queries: Dict[Id, Query], qrel_file_path: str, engine: Engine,
 import ast
 
 if __name__ == "__main__":
-    engine = es.Elasticsearch(["http://big18:9200/"])
+    engine = es.Elasticsearch(["http://big4:9200/"])
     print("engine ok :",engine)
     f = open("/local/karmim/Stage_M1_RI/data/robust2004.txt","r")
     #print(f.read())

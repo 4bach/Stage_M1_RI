@@ -14,7 +14,7 @@ data.set_params(vectorizer,tf_idf_path)
 
 data.load_all_query()
 data.load_relevance()
-data.load_all_docs()
+data.load_docs_per_folder()
 
 data.get_query('302')
 data.get_doc('FBIS4-11528')
