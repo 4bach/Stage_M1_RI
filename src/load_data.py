@@ -7,6 +7,7 @@ import json
 import os
 import pickle
 import time
+import torch
 import progressbar
 import codecs
 from gensim.models import KeyedVectors
@@ -16,7 +17,7 @@ from os.path import isfile, join
 from gensim.parsing.preprocessing import preprocess_string,remove_stopwords,strip_numeric, strip_tags, strip_punctuation
 from sklearn.metrics.pairwise import cosine_similarity
 #from sklearn.feature_extraction.text import CountVectorizer
-import fasttext # On utilise fastText car il fait automatiquement le prétraitement pour les mots inconnus. 
+#import fasttext # On utilise fastText car il fait automatiquement le prétraitement pour les mots inconnus. 
 from gensim.models.wrappers import FastText
 
 
@@ -36,7 +37,7 @@ class Dataset:
         self.intervals = intervals
         self.intvlsArray = np.linspace(-1, 1, self.intervals)
         self.max_length_query = 0
-        self.docs = {}
+        self.docs = {} # Dico de tout les documents de robust4
         self.normalize = normalize
         self.model_wv = FastText.load_fasttext_format(embeddings_path + sep + "parameters.bin")
 
@@ -91,36 +92,82 @@ class Dataset:
             for file in f: 
                 self.all_doc.append(os.path.join(r,file)) 
 
-    def load_all_query(self,file_query="/local/karmim/Stage_M1_RI/data/robust2004.txt"):
+    def load_all_query(self,file_query="/local/karmim/Stage_M1_RI/data/robust2004.txt",file_json="/local/karmim/Stage_M1_RI/data/object_python/query.json"):
+
         """
             On recupère toutes les querys qui sont ensuite sauvegardées dans un dictionnaire. 
 
         """
-        f = open(file_query,"r")
-        self.d_query = ast.literal_eval(f.read())
-        f.close()
-        for k in self.d_query :
-            self.d_query[k]= self.d_query[k][0].split(' ') # On suppr les query langage naturel, et on met la query mot clé sous forme de liste.
-        self.max_length_query =  np.max([len(self.d_query[q]) for q in self.d_query])
-        print("query chargé\n")
+        self.d_query={}
+        exists = os.path.isfile(file_json)
+        if not exists : 
+            f = open(file_query,"r")
+            self.d_query = ast.literal_eval(f.read())
+            f.close()
+            for k in self.d_query :
+                self.d_query[k]= self.d_query[k][0].split(' ') # On suppr les query langage naturel, et on met la query mot clé sous forme de liste.
+            self.max_length_query =  np.max([len(self.d_query[q]) for q in self.d_query])
+            print("query chargé\n")
+            save = json.dumps(self.d_query)
+            f = open(file_json,"w")
+            f.write(save)
+            f.close()
+            print("query.json save")
+        else:
+            print("Chargement du fichier query.json")
+            with open(file_json) as json_file:
+                self.d_query = json.load(json_file)
+            print("query chargé\n")
+        
+        return self.d_query
+            
+    def load_relevance(self,file_rel="/local/karmim/Stage_M1_RI/data/qrels.robust2004.txt",file_json="/local/karmim/Stage_M1_RI/data/object_python/qrel.json"):
+        
+        """
+            Chargement du fichier des pertinences pour les requêtes. 
+            Pour chaque paire query/doc on nous dit si pertinent ou non. 
+        """
+        self.paires = {}
+        exists = os.path.isfile(file_json)
+        if not exists:
+            with open(file_rel,"r") as f:
+                for line in f :
+                    l = line.split(' ')
+                    self.paires.setdefault(l[0],{})
+                    self.paires[l[0]].setdefault('relevant',[])
+                    self.paires[l[0]].setdefault('irrelevant',[])
+                    if l[-1]=='1':
+                        self.paires[l[0]]['relevant'].append(l[2])
+                    else:
+                        self.paires[l[0]]['irrelevant'].append(l[2])
+            save = json.dumps(self.paires)
+            f = open(file_json,"w")
+            f.write(save)
+            f.close()
+            print("Le fichier qrel.json a bien été enregistré.")
+
+        else:
+            print("Chargement du fichier qrel.json")
+            with open(file_json) as json_file:
+                self.paires = json.load(json_file)
+            print("relevance chargé\n")
+        return self.paires
+        
+        
+
 
     def load_doc(self,file_doc,pre_process=True):
         """
             Fonction qui load un fichier file_doc. 
             pre_process -> Bool qui dit si on effectue le preprocessing ou non. 
         """
-        cpt_err = 0
-        with codecs.open(file_doc,'r',encoding='utf-8',errors='ignore') as f:
-            soup = BeautifulSoup(f.read(),"html.parser")
-        id_ = soup.find_all('docno')
-        text_ = soup.find_all('text')
         
-        for i in range(len(id_)):
-            try:
-                self.docs[(id_[i].text).strip()] =  preprocess_string(text_[i].text, self.CUSTOM_FILTERS)[2:]
-            except IndexError:
-                cpt_err+=1
-                print("len des id: ",len(id_)," i courant : ",i, " erreur: ",cpt_err)
+        with codecs.open(file_doc,'r',encoding='utf-8',errors='ignore') as f_:
+            soup = BeautifulSoup(f_.read(),"html.parser")
+        docs = soup.find_all('doc')
+        for d_ in docs :  
+            self.docs[d_.docno.text.strip()]=preprocess_string(d_.text,self.CUSTOM_FILTERS)
+        
         return self.docs
 
 
@@ -150,6 +197,10 @@ class Dataset:
         print("docs chargé\n")
     
     def load_docs_per_folder(self,path_json = '/local/karmim/Stage_M1_RI/data/object_python/',path_collection="/local/karmim/Stage_M1_RI/data/collection"):
+        
+        """
+            Fonction qui charge tout les docs mais en construisant 4 dictionnaires des 4 dossier FBIS,FR94,FT,LATIMES.
+        """
         folder = ['FBIS','FR94','FT','LATIMES']
         self.fbis = {}
         self.fr94 = {}
@@ -182,27 +233,40 @@ class Dataset:
                 print("Chargement du fichier json : "+path_json+d+'.json ...')
                 with open(path_json+d+'.json') as json_file:
                     l[i] = json.load(json_file)
+        return (self.fbis,self.fr94,self.ft,self.latimes)
 
-    def load_relevance(self,file_rel="/local/karmim/Stage_M1_RI/data/qrels.robust2004.txt"):
+    
+    def embedding_query(self,file_pkl="/local/karmim/Stage_M1_RI/data/object_python/emb_query.pkl" ):
         """
-            Chargement du fichier des pertinences pour les requêtes. 
-            Pour chaque paire query/doc on nous dit si pertinent ou non. 
+            Fonction qui transforme nos mots du dictionnaire de query par des embeddings (vecteurs).
         """
-        self.paires = {}
-        with open(file_rel,"r") as f:
-            for line in f :
-                l = line.split(' ')
-                self.paires.setdefault(l[0],{})
-                self.paires[l[0]].setdefault('relevant',[])
-                self.paires[l[0]].setdefault('irrelevant',[])
-                if l[-1]=='1':
-                    self.paires[l[0]]['relevant'].append(l[2])
-                else:
-                    self.paires[l[0]]['irrelevant'].append(l[2])
+        exists = os.path.isfile(file_pkl)
+        self.query_emb = self.d_query.copy()
+        print("type = ",type(self.query_emb))
+
+        if not exists : 
+            for k in self.d_query:
+                for i in range(len(self.d_query[k])):
+                    print("self.d_query in self.model ",self.d_query[k][i] in self.model_wv)
+                    if self.d_query[k][i] in self.model_wv:
+                        print(self.d_query[k][i])
+                        self.query_emb[k][i] = self.model_wv[self.d_query[k][i]]
+                    
+                    else:
+                        cpt+=1
+            print("Nombre d'erreurs :",cpt)
+            pickle.dump( self.query_emb, open( file_pkl, "wb" ) )
+            print("Le fichier emb_query.pkl a bien été enregistré.")
         
-        print("relevance chargé\n")
-        return self.paires
+        else:    
+            print("Chargement du fichier pickle : emb_query.pkl ...")
+            self.query_emb = pickle.load( open( file_pkl, "rb" ) )
+            print("Chargement emb_query.pkl réussi")
 
+        return self.query_emb
+
+    def embedding_doc(self):
+        pass
 
     def hist(self, query, document):
         """
