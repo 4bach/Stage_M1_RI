@@ -9,15 +9,18 @@ data = load_data.Dataset(30,normalize=False)
 voc = data.get_vocab()
 vocabulary = [w for w in voc]
 vectorizer = CountVectorizer(analyzer='word', vocabulary=vocabulary, binary=True, lowercase=False)
-tf_idf_path = '/local/karmim/Stage_M1_RI/data/object_python/idf_robust2004.pkl'
-data.set_params(vectorizer,tf_idf_path)
+#tf_idf_path = '/local/karmim/Stage_M1_RI/data/object_python/idf_robust2004.pkl'
+#data.set_params(vectorizer,tf_idf_path)
 
 data.load_all_query()
 data.load_relevance()
 data.load_all_docs()
-
+print("\n----     DOC QUERY ET RELEVANCE CHARGÉ       ---\n")
 data.get_query('302')
 data.get_doc('FBIS4-11528')
 data.get_relevance('302')
 
+data.embedding_query()
+data.embedding_doc()
+print("\n----     EMBEDDINGS DOCS ET QUERY TERMINÉ       ----\n")
 

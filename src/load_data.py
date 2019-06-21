@@ -41,13 +41,14 @@ class Dataset:
         self.normalize = normalize
         self.model_wv = FastText.load_fasttext_format(embeddings_path + sep + "parameters.bin")
 
-    def set_params(self, vectoriser, idf_file="idf_robust2004.pkl",robust_path="/local/karmim/Stage_M1_RI/data/collection"):
+    def set_params(self, idf_file="idf_robust2004.pkl",robust_path="/local/karmim/Stage_M1_RI/data/collection"):
         
-        self.vectoriser = vectoriser 
+        # self.vectoriser = vectoriser 
         #dict: term -> idf
         self.idf_values = pickle.load(open(idf_file, "rb"))
         self.robust_path = robust_path
-
+        self.embedding_query()
+        self.embedding_doc()
     def get_vocab(self):
 
         return self.model_wv.wv.vocab
@@ -171,7 +172,7 @@ class Dataset:
         return self.docs
 
 
-    def load_all_docs(self,doc_json="../data/object_python/all_docs_preprocess.json"):
+    def load_all_docs(self,doc_json="/local/karmim/Stage_M1_RI/data/object_python/all_docs_preprocess.json"):
         """
             Charge tout les docs dans un dico, puis les enregistre dans un fichier json. 
             Charge directement le fichier doc_json s'il existe.  
@@ -242,19 +243,18 @@ class Dataset:
         """
         exists = os.path.isfile(file_pkl)
         self.query_emb = self.d_query.copy()
-        print("type = ",type(self.query_emb))
-
+        cpt=0
         if not exists : 
-            for k in self.d_query:
-                for i in range(len(self.d_query[k])):
-                    print("self.d_query in self.model ",self.d_query[k][i] in self.model_wv)
-                    if self.d_query[k][i] in self.model_wv:
-                        print(self.d_query[k][i])
-                        self.query_emb[k][i] = self.model_wv[self.d_query[k][i]]
+            for k in self.d_query: 
+                for i,w in enumerate(self.d_query[k]): 
+                #print(w) 
+                #print(type(w)) 
+                 if  w in self.model_wv: 
+                    self.query_emb[k][i] = self.model_wv[w]
                     
-                    else:
-                        cpt+=1
-            print("Nombre d'erreurs :",cpt)
+                else:
+                    cpt+=1
+            print("Nombre de mots ignorés :",cpt)
             pickle.dump( self.query_emb, open( file_pkl, "wb" ) )
             print("Le fichier emb_query.pkl a bien été enregistré.")
         
@@ -265,8 +265,30 @@ class Dataset:
 
         return self.query_emb
 
-    def embedding_doc(self):
-        pass
+    def embedding_doc(self,file_pkl="/local/karmim/Stage_M1_RI/data/object_python/emb_docs.pkl"):
+        exists = os.path.isfile(file_pkl)
+        self.docs_emb = self.docs.copy()
+        cpt=0
+        if not exists : 
+            for k in self.docs: 
+                for i,w in enumerate(self.docs[k]): 
+                #print(w) 
+                #print(type(w)) 
+                 if  w in self.model_wv: 
+                    self.docs_emb[k][i] = self.model_wv[w]
+                    
+                else:
+                    cpt+=1
+            print("Nombre de mots ignorés :",cpt)
+            pickle.dump( self.query_emb, open( file_pkl, "wb" ) )
+            print("Le fichier emb_docs.pkl a bien été enregistré.")
+        
+        else:    
+            print("Chargement du fichier pickle : emb_docs.pkl ...")
+            self.query_emb = pickle.load( open( file_pkl, "rb" ) )
+            print("Chargement emb_docs.pkl réussi")
+
+        return self.docs_emb
 
     def hist(self, query, document):
         """
@@ -290,59 +312,59 @@ class Dataset:
     def prepare_data_forNN(self, test_size=0.2):
         """
         """
+        pass
+        # #spliter les requêtes en train/test
+        # lol = [q for q in self.d_query.keys() if q in self.paires]
+        # random.shuffle(lol)
+        # test_keys = lol[:int(test_size * len(lol))]
+        # train_keys = lol[int(test_size * len(lol)):]
+        
+        # #pour chaque requête on va générer autant de paires relevant que irrelevant
+        # #pour nos besoins on va alterner paires positives et paires négatives
+        # train_hist = [] # les histogrammes d'interraction
+        # test_hist = []
+        # train_idf = [] #les vecteurs d'idf
+        # test_idf = []
+        
+        # for id_requete in train_keys:
+        #     #recuperer les mots dont on connait les embeddings dans la query
+        #     q = self.vectoriser.transform([' '.join(self.d_query[id_requete])])
+        #     idf_vec = self.get_idf_vec(self.d_query[id_requete])
+        #     for pos, neg in zip(self.paires[id_requete]["relevant"], self.paires[id_requete]["irrelevant"]):
+        #         #lire le doc, la requete et creer l'histogramme d'interraction
+                
+        #         d = self.vectoriser.transform([' '.join(self.docs[pos])])
+        #         train_hist.append(self.hist(q, d)) #append le doc positif
+        #         train_idf.append(idf_vec) #append le vecteur idf de la requête
+                
+                
+        #         d = self.vectoriser.transform([' '.join(self.docs[neg])])
+        #         train_hist.append(self.hist(q, d)) #append le doc négatif
+        #         train_idf.append(idf_vec) #append le vecteur idf de la requête
+        # train_labels = np.zeros(len(train_hist))
+        # train_labels[::2] = 1 # label de pertinence 
+        
+        
+        # for id_requete in test_keys:
+        #     #recuperer les mots dont on connait les embeddings dans la query
+        #     q = self.vectoriser.transform([' '.join(self.d_query[id_requete])])
+        #     idf_vec = self.get_idf_vec(self.d_query[id_requete])
+        #     for pos, neg in zip(self.paires[id_requete]["relevant"], self.paires[id_requete]["irrelevant"]):
+        #         #lire le doc, la requete et creer l'histogramme d'interraction
+                
+        #         d = self.vectoriser.transform([' '.join(self.docs[pos])])
 
-        #spliter les requêtes en train/test
-        lol = [q for q in self.d_query.keys() if q in self.paires]
-        random.shuffle(lol)
-        test_keys = lol[:int(test_size * len(lol))]
-        train_keys = lol[int(test_size * len(lol)):]
-        
-        #pour chaque requête on va générer autant de paires relevant que irrelevant
-        #pour nos besoins on va alterner paires positives et paires négatives
-        train_hist = [] # les histogrammes d'interraction
-        test_hist = []
-        train_idf = [] #les vecteurs d'idf
-        test_idf = []
-        
-        for id_requete in train_keys:
-            #recuperer les mots dont on connait les embeddings dans la query
-            q = self.vectoriser.transform([' '.join(self.d_query[id_requete])])
-            idf_vec = self.get_idf_vec(self.d_query[id_requete])
-            for pos, neg in zip(self.paires[id_requete]["relevant"], self.paires[id_requete]["irrelevant"]):
-                #lire le doc, la requete et creer l'histogramme d'interraction
+        #         test_hist.append(self.hist(q, d)) #append le doc positif
+        #         test_idf.append(idf_vec) #append le vecteur idf de la requête
                 
-                d = self.vectoriser.transform([' '.join(self.docs[pos])])
-                train_hist.append(self.hist(q, d)) #append le doc positif
-                train_idf.append(idf_vec) #append le vecteur idf de la requête
-                
-                
-                d = self.vectoriser.transform([' '.join(self.docs[neg])])
-                train_hist.append(self.hist(q, d)) #append le doc négatif
-                train_idf.append(idf_vec) #append le vecteur idf de la requête
-        train_labels = np.zeros(len(train_hist))
-        train_labels[::2] = 1 # label de pertinence 
-        
-        
-        for id_requete in test_keys:
-            #recuperer les mots dont on connait les embeddings dans la query
-            q = self.vectoriser.transform([' '.join(self.d_query[id_requete])])
-            idf_vec = self.get_idf_vec(self.d_query[id_requete])
-            for pos, neg in zip(self.paires[id_requete]["relevant"], self.paires[id_requete]["irrelevant"]):
-                #lire le doc, la requete et creer l'histogramme d'interraction
-                
-                d = self.vectoriser.transform([' '.join(self.docs[pos])])
-
-                test_hist.append(self.hist(q, d)) #append le doc positif
-                test_idf.append(idf_vec) #append le vecteur idf de la requête
-                
-                d = self.vectoriser.transform([' '.join(self.docs[neg])])
+        #         d = self.vectoriser.transform([' '.join(self.docs[neg])])
 
 
-                test_hist.append(self.hist(q, d)) #append le doc négatif
-                test_idf.append(idf_vec) #append le vecteur idf de la requête
-        test_labels = np.zeros(len(train_hist))
-        test_labels[::2] = 1
+        #         test_hist.append(self.hist(q, d)) #append le doc négatif
+        #         test_idf.append(idf_vec) #append le vecteur idf de la requête
+        # test_labels = np.zeros(len(train_hist))
+        # test_labels[::2] = 1
         
-        return (train_hist, train_idf, train_labels), (test_hist, test_idf, test_labels)
+        # return (train_hist, train_idf, train_labels), (test_hist, test_idf, test_labels)
         
-        #éventuellement sauvegarder tout ça sur le disque comme ça c fait une bonne fois pour toutes...
+        # #éventuellement sauvegarder tout ça sur le disque comme ça c fait une bonne fois pour toutes...
