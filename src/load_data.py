@@ -280,12 +280,12 @@ class Dataset:
                 else:
                     cpt+=1
             print("Nombre de mots ignorés :",cpt)
-            pickle.dump( self.query_emb, open( file_pkl, "wb" ) )
+            pickle.dump( self.docs_emb, open( file_pkl, "wb" ) )
             print("Le fichier emb_docs.pkl a bien été enregistré.")
         
         else:    
             print("Chargement du fichier pickle : emb_docs.pkl ...")
-            self.query_emb = pickle.load( open( file_pkl, "rb" ) )
+            self.docs_emb = pickle.load( open( file_pkl, "rb" ) )
             print("Chargement emb_docs.pkl réussi")
 
         return self.docs_emb
