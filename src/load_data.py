@@ -15,7 +15,6 @@ from bs4 import BeautifulSoup
 from os import listdir,sep
 from os.path import isfile, join
 from gensim.parsing.preprocessing import preprocess_string,remove_stopwords,strip_numeric, strip_tags, strip_punctuation
-from sklearn.metrics.pairwise import cosine_similarity
 #from sklearn.feature_extraction.text import CountVectorizer
 #import fasttext # On utilise fastText car il fait automatiquement le prétraitement pour les mots inconnus. 
 from gensim.models.wrappers import FastText
@@ -27,18 +26,18 @@ from gensim.models.wrappers import FastText
 
 class Dataset:
 
-    def __init__(self,intervals,normalize,CUSTOM_FILTERS = [lambda x: x.lower(),remove_stopwords,strip_numeric, strip_tags, strip_punctuation] ,embeddings_path="/local/karmim/Stage_M1_RI/data/vocab"):
+    def __init__(self,CUSTOM_FILTERS = [lambda x: x.lower(),remove_stopwords,strip_numeric, strip_tags, strip_punctuation] ,embeddings_path="/local/karmim/Stage_M1_RI/data/vocab"):
         """
             all_doc : dictionnaire de tout nos documents afin d'itérer dessus. 
 
         """
         self.d_query = {} # Notre dictionnaire de query
         self.CUSTOM_FILTERS = CUSTOM_FILTERS # Liste de fonction de Préprocessing des docs
-        self.intervals = intervals
-        self.intvlsArray = np.linspace(-1, 1, self.intervals)
+        #self.intervals = intervals
+        #self.intvlsArray = np.linspace(-1, 1, self.intervals)
         self.max_length_query = 0
         self.docs = {} # Dico de tout les documents de robust4
-        self.normalize = normalize
+        #self.normalize = normalize
         self.model_wv = FastText.load_fasttext_format(embeddings_path + sep + "parameters.bin")
 
     def set_params(self, idf_file="idf_robust2004.pkl",robust_path="/local/karmim/Stage_M1_RI/data/collection"):
@@ -196,7 +195,9 @@ class Dataset:
                 self.docs = json.load(json_file)
                 
         print("docs chargé\n")
-    
+
+        return self.docs
+
     def load_docs_per_folder(self,path_json = '/local/karmim/Stage_M1_RI/data/object_python/',path_collection="/local/karmim/Stage_M1_RI/data/collection"):
         
         """
@@ -266,6 +267,10 @@ class Dataset:
         return self.query_emb
 
     def embedding_doc(self,file_pkl="/local/karmim/Stage_M1_RI/data/object_python/emb_docs.pkl"):
+        """
+            Prends trop de mémoire. 
+            Chargement direct des interractions.
+        """
         exists = os.path.isfile(file_pkl)
         self.docs_emb = self.docs.copy()
         cpt=0
@@ -289,82 +294,3 @@ class Dataset:
             print("Chargement emb_docs.pkl réussi")
 
         return self.docs_emb
-
-    def hist(self, query, document):
-        """
-        """
-        X = []
-        for i in query.nonzero()[1]:
-            histo = []
-            for j in document.nonzero()[1]:
-                histo.append(cosine_similarity([self.model_wv.vectors[i]], [self.model_wv.vectors[j]])[0][0])
-            histo, _ = np.histogram(histo, bins=self.intvlsArray)
-            if self.normalize:
-                histo = histo / histo.sum()
-            X.append(histo)
-        if len(query.nonzero()[1]) < self.max_length_query:
-            # compléter avec des zéro
-            for i in range(self.max_length_query - len(query.nonzero()[1])):
-                X.append([0]*self.intervals)
-        #retourner histogramme interactions
-        return np.array(X)
-
-    def prepare_data_forNN(self, test_size=0.2):
-        """
-        """
-        pass
-        # #spliter les requêtes en train/test
-        # lol = [q for q in self.d_query.keys() if q in self.paires]
-        # random.shuffle(lol)
-        # test_keys = lol[:int(test_size * len(lol))]
-        # train_keys = lol[int(test_size * len(lol)):]
-        
-        # #pour chaque requête on va générer autant de paires relevant que irrelevant
-        # #pour nos besoins on va alterner paires positives et paires négatives
-        # train_hist = [] # les histogrammes d'interraction
-        # test_hist = []
-        # train_idf = [] #les vecteurs d'idf
-        # test_idf = []
-        
-        # for id_requete in train_keys:
-        #     #recuperer les mots dont on connait les embeddings dans la query
-        #     q = self.vectoriser.transform([' '.join(self.d_query[id_requete])])
-        #     idf_vec = self.get_idf_vec(self.d_query[id_requete])
-        #     for pos, neg in zip(self.paires[id_requete]["relevant"], self.paires[id_requete]["irrelevant"]):
-        #         #lire le doc, la requete et creer l'histogramme d'interraction
-                
-        #         d = self.vectoriser.transform([' '.join(self.docs[pos])])
-        #         train_hist.append(self.hist(q, d)) #append le doc positif
-        #         train_idf.append(idf_vec) #append le vecteur idf de la requête
-                
-                
-        #         d = self.vectoriser.transform([' '.join(self.docs[neg])])
-        #         train_hist.append(self.hist(q, d)) #append le doc négatif
-        #         train_idf.append(idf_vec) #append le vecteur idf de la requête
-        # train_labels = np.zeros(len(train_hist))
-        # train_labels[::2] = 1 # label de pertinence 
-        
-        
-        # for id_requete in test_keys:
-        #     #recuperer les mots dont on connait les embeddings dans la query
-        #     q = self.vectoriser.transform([' '.join(self.d_query[id_requete])])
-        #     idf_vec = self.get_idf_vec(self.d_query[id_requete])
-        #     for pos, neg in zip(self.paires[id_requete]["relevant"], self.paires[id_requete]["irrelevant"]):
-        #         #lire le doc, la requete et creer l'histogramme d'interraction
-                
-        #         d = self.vectoriser.transform([' '.join(self.docs[pos])])
-
-        #         test_hist.append(self.hist(q, d)) #append le doc positif
-        #         test_idf.append(idf_vec) #append le vecteur idf de la requête
-                
-        #         d = self.vectoriser.transform([' '.join(self.docs[neg])])
-
-
-        #         test_hist.append(self.hist(q, d)) #append le doc négatif
-        #         test_idf.append(idf_vec) #append le vecteur idf de la requête
-        # test_labels = np.zeros(len(train_hist))
-        # test_labels[::2] = 1
-        
-        # return (train_hist, train_idf, train_labels), (test_hist, test_idf, test_labels)
-        
-        # #éventuellement sauvegarder tout ça sur le disque comme ça c fait une bonne fois pour toutes...

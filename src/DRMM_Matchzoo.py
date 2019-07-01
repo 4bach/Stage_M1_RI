@@ -1,150 +1,118 @@
-import numpy as np
-import matchzoo 
-import gensim
-import ast
-import json
-from gensim.models import KeyedVectors
-from bs4 import BeautifulSoup
-from os import listdir,sep
-from os.path import isfile, join
-from gensim.parsing.preprocessing import preprocess_string,remove_stopwords,strip_numeric, strip_tags, strip_punctuation
-from sklearn.metrics.pairwise import cosine_similarity
-#from sklearn.feature_extraction.text import CountVectorizer
-import fasttext # On utilise fastText car il fait automatiquement le prétraitement pour les mots inconnus. 
- 
+"""An implementation of DRMM Model."""
+import typing
 
-def get_all_docs_robust4(folder="/local/karmim/Stage_M1_RI/data/collection"):
-    dossier = ['FBIS','FR94','FT','LATIMES']
-    all_doc ={}
+import keras
+import keras.backend as K
 
-    for d in dossier : 
-        all_doc[d] = [f for f in listdir(folder+'/'+d) if isfile(join(folder+'/'+d, f))]
-    return all_doc
+from matchzoo.engine.base_model import BaseModel
+from matchzoo.engine.param import Param
+from matchzoo.engine.param_table import ParamTable
+from matchzoo.engine import hyper_spaces
 
 
+class DRMM(BaseModel):
+    """
+    DRMM Model.
+    Examples:
+        >>> model = DRMM()
+        >>> model.params['mlp_num_layers'] = 1
+        >>> model.params['mlp_num_units'] = 5
+        >>> model.params['mlp_num_fan_out'] = 1
+        >>> model.params['mlp_activation_func'] = 'tanh'
+        >>> model.guess_and_fill_missing_params(verbose=0)
+        >>> model.build()
+        >>> model.compile()
+    """
 
+    @classmethod
+    def get_default_params(cls) -> ParamTable:
+        """:return: model default parameters."""
+        params = super().get_default_params(with_embedding=True,
+                                            with_multi_layer_perceptron=True)
+        params.add(Param(name='mask_value', value=-1,
+                         desc="The value to be masked from inputs."))
+        params['optimizer'] = 'adam'
+        params['input_shapes'] = [(5,), (5, 30,)]
+        return params
 
-class DRMM_Matchzoo:
+    def build(self):
+        """Build model structure."""
 
-    def __init__(self,all_doc,CUSTOM_FILTERS = [lambda x: x.lower(),remove_stopwords,strip_numeric, strip_tags, strip_punctuation],embeddings_path="/local/karmim/Stage_M1_RI/data/vocab" ):
+        # Scalar dimensions referenced here:
+        #   B = batch size (number of sequences)
+        #   D = embedding size
+        #   L = `input_left` sequence length
+        #   R = `input_right` sequence length
+        #   H = histogram size
+        #   K = size of top-k
+
+        # Left input and right input.
+        # query: shape = [B, L]
+        # doc: shape = [B, L, H]
+        # Note here, the doc is the matching histogram between original query
+        # and original document.
+        query = keras.layers.Input(
+            name='text_left',
+            shape=self._params['input_shapes'][0]
+        )
+        match_hist = keras.layers.Input(
+            name='match_histogram',
+            shape=self._params['input_shapes'][1]
+        )
+
+        embedding = self._make_embedding_layer()
+        # Process left input.
+        # shape = [B, L, D]
+        embed_query = embedding(query)
+        # shape = [B, L]
+        atten_mask = K.not_equal(query, self._params['mask_value'])
+        # shape = [B, L]
+        atten_mask = K.cast(atten_mask, K.floatx())
+        # shape = [B, L, D]
+        atten_mask = K.expand_dims(atten_mask, axis=2)
+        # shape = [B, L, D]
+        attention_probs = self.attention_layer(embed_query, atten_mask)
+
+        # Process right input.
+        # shape = [B, L, 1]
+        dense_output = self._make_multi_layer_perceptron_layer()(match_hist)
+
+        # shape = [B, 1, 1]
+        dot_score = keras.layers.Dot(axes=[1, 1])(
+            [attention_probs, dense_output])
+
+        flatten_score = keras.layers.Flatten()(dot_score)
+
+        x_out = self._make_output_layer()(flatten_score)
+        self._backend = keras.Model(inputs=[query, match_hist], outputs=x_out)
+
+    @classmethod
+    def attention_layer(cls, attention_input: typing.Any,
+                        attention_mask: typing.Any = None
+                        ) -> keras.layers.Layer:
         """
-            all_doc : dictionnaire de tout nos documents afin d'itérer dessus. 
-
+        Performs attention on the input.
+        :param attention_input: The input tensor for attention layer.
+        :param attention_mask: A tensor to mask the invalid values.
+        :return: The masked output tensor.
         """
-        self.d_query = {} # Notre dictionnaire de query
-        self.all_doc= all_doc # Liste de tout nos documents
-        self.CUSTOM_FILTERS = CUSTOM_FILTERS # Liste de fonction de Préprocessing des docs
-        self.model = fasttext.load_model(embeddings_path + sep + "model.bin", binary=True)
-        #self.vocabulary = [w for w in self.model.vocab] #inutile pour le moment. 
-        self.max_length_query = 0
-        self.current_docs = {}
-        self.json_doc_exist = False
+        # shape = [B, L, 1]
+        dense_input = keras.layers.Dense(1, use_bias=False)(attention_input)
+        if attention_mask is not None:
+            # Since attention_mask is 1.0 for positions we want to attend and
+            # 0.0 for masked positions, this operation will create a tensor
+            # which is 0.0 for positions we want to attend and -10000.0 for
+            # masked positions.
 
-
-
-    def load_all_query(self,file_query="/local/karmim/Stage_M1_RI/data/robust2004.txt"):
-        """
-            On recupère toutes les querys qui sont ensuite sauvegardées dans un dictionnaire. 
-
-        """
-        f = open(file_query,"r")
-        self.d_query = ast.literal_eval(f.read())
-        f.close()
-        for k in self.d_query :
-            self.d_query[k]= self.d_query[k][0].split(' ') # On suppr les query langage naturel, et on met la query mot clé sous forme de liste.
-        self.max_length_query =  np.max([len(self.d_query[q]) for q in self.d_query])
-    
-    def load_doc(self,file_doc):
-        with open(file_doc,"r") as f:
-            soup = BeautifulSoup(f.read(),"html.parser")
-        id_ = soup.find_all('docno')
-        text_ = soup.find_all('text')
-        
-        for i in range(len(id_)):
-            self.current_docs[id_[i].text] =  preprocess_string(text_[i].text, self.CUSTOM_FILTERS)[2:]
-        
-        return self.current_docs
-
-
-    def load_all_docs(self,doc_json="../data/object_python/all_docs_preprocess.json"):
-        """
-            Charge tout les docs dans un dico. 
-        """
-        if not self.json_doc_exist:
-            for i in ['FBIS','FR94','FT','LATIMES']:
-                for doc in self.all_doc[i]:
-                    self.load_doc(doc)
-
-            save = json.dumps(self.current_docs)
-            f = open(doc_json,"w")
-            f.write(save)
-            f.close()
-            self.json_doc_exist = True
-
-        else:
-            self.current_docs = json.load(doc_json)
-
-    def load_relevance(self,file_rel="/local/karmim/Stage_M1_RI/data/qrels.robust2004.txt"):
-        """
-            Chargement du fichier des pertinences pour les requêtes. 
-            Pour chaque paire query/doc on nous dit si pertinent ou non. 
-        """
-        self.paires = {}
-        with open(file_rel,"r") as f:
-            for line in f :
-                l = line.split(' ')
-                self.paires.setdefault(l[0],{})
-                self.paires[l[0]].setdefault('relevant',[])
-                self.paires[l[0]].setdefault('irrelevant',[])
-                if l[-1]=='1':
-                    self.paires[l[0]]['relevant'].append(l[2])
-                else:
-                    self.paires[l[0]]['irrelevant'].append(l[2])
-        return self.paires
-
-    def embedding_query(self):
-        """
-            Fonction qui transforme nos mots du dictionnaire de query par des embeddings (vecteurs).
-        """
-        for k in self.d_query:
-            for i in range(len(self.d_query[k])):
-                try:
-                    self.d_query[k][i] = self.model.get_word_vector(self.d_query[k][i])
-                    
-                except KeyError:
-                    pass
-        return self.d_query
-
-    def calcul_interaction(self,query,document,bins_=4,normalize=False):
-        """
-            Fonction qui calcul un histogramme d'une interaction cosinus similarité entre une query et un doc. 
-            Entrée -> Embedding d'une query et d'un document.
-                      bins : Nombre d'intervalles dans l'histogramme.
-                      normalize : Bool pour normaliser l'histogramme. 
-            Sortie -> Renvoie une matrice d'histogramme.
-        """
-        X = []
-        #Embedding du doc 
-        for d in range(len(document)):
-            try:
-                document[d] = self.model.get_word_vector(document[d])
-                    
-            except KeyError:
-                pass
-
-
-        # Calcul de similarité entre doc et query 
-        for q in query:
-            histo = []
-            for d in document:
-                histo.append(cosine_similarity(q, d)[0][0])
-            histo, bin_edges = np.histogram(histo, bins= bins_)
-            if normalize:
-                histo = histo / histo.sum()
-            X.append(histo)
-        return np.array(X)
-        
-        
-
-    
-
+            # shape = [B, L, 1]
+            dense_input = keras.layers.Lambda(
+                lambda x: x + (1.0 - attention_mask) * -10000.0,
+                name="attention_mask"
+            )(dense_input)
+        # shape = [B, L, 1]
+        attention_probs = keras.layers.Lambda(
+            lambda x: keras.layers.activations.softmax(x, axis=1),
+            output_shape=lambda s: (s[0], s[1], s[2]),
+            name="attention_probs"
+        )(dense_input)
+        return attention_probs

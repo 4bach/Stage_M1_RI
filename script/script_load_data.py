@@ -5,7 +5,7 @@ import load_data
 
 
 
-data = load_data.Dataset(30,normalize=False)
+data = load_data.Dataset()
 voc = data.get_vocab()
 vocabulary = [w for w in voc]
 vectorizer = CountVectorizer(analyzer='word', vocabulary=vocabulary, binary=True, lowercase=False)
