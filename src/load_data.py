@@ -106,7 +106,7 @@ class Dataset:
             f.close()
             for k in self.d_query :
                 self.d_query[k]= self.d_query[k][0].split(' ') # On suppr les query langage naturel, et on met la query mot clé sous forme de liste.
-            self.max_length_query =  np.max([len(self.d_query[q]) for q in self.d_query])
+            
             print("query chargé\n")
             save = json.dumps(self.d_query)
             f = open(file_json,"w")
@@ -118,7 +118,8 @@ class Dataset:
             with open(file_json) as json_file:
                 self.d_query = json.load(json_file)
             print("query chargé\n")
-        
+        self.max_length_query =  np.max([len(self.d_query[q]) for q in self.d_query])
+        print("Longueur max query : ",self.max_length_query)
         return self.d_query
             
     def load_relevance(self,file_rel="/local/karmim/Stage_M1_RI/data/qrels.robust2004.txt",file_json="/local/karmim/Stage_M1_RI/data/object_python/qrel.json"):
@@ -136,10 +137,10 @@ class Dataset:
                     self.paires.setdefault(l[0],{})
                     self.paires[l[0]].setdefault('relevant',[])
                     self.paires[l[0]].setdefault('irrelevant',[])
-                    if l[-1]=='1':
-                        self.paires[l[0]]['relevant'].append(l[2])
-                    else:
+                    if l[-1].rstrip()=='0':
                         self.paires[l[0]]['irrelevant'].append(l[2])
+                    else:
+                        self.paires[l[0]]['relevant'].append(l[2])
             save = json.dumps(self.paires)
             f = open(file_json,"w")
             f.write(save)

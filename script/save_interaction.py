@@ -1,39 +1,53 @@
+"""
+    In this file we save and compute all the interactions from the file qrel.
+
+"""
 import sys
 sys.path.insert(0, '/local/karmim/Stage_M1_RI/src')
 import load_data
 import numpy as np 
 from sklearn.metrics.pairwise import cosine_similarity
+import time
+import warnings
+
+if not sys.warnoptions:
+    warnings.simplefilter("ignore")
+
 
 data = load_data.Dataset()
 relevance = data.load_relevance()
 docs = data.load_all_docs()
+query = data.load_all_query()
 que_emb = data.embedding_query()
+max_length = data.max_length_query
+#cosine_similarity(data.model_wv['car'].reshape(1,-1),data.model_wv['truck'].reshape(1,-1)).item()
+#hist = np.array([cosine_similarity(que_emb['301'][0].reshape(1,-1),data.model_wv[i].reshape(1,-1)).item() for i in docs['LA070389-0001']]) 
 
 
-cosine_similarity(data.model_wv['car'].reshape(1,-1),data.model_wv['truck'].reshape(1,-1)).item()
-hist = np.array([cosine_similarity(que_emb['301'][0].reshape(1,-1),data.model_wv[i].reshape(1,-1)).item() for i in docs['LA070389-0001']]) 
 
-
-def hist(self, query, document):
+def histo( query, document,intervals=30,histo_type='CH'):
     """
-    """
-    X = []
-    for i in query.nonzero()[1]:
-        histo = []
-        for j in document.nonzero()[1]:
-            histo.append(cosine_similarity([self.model_wv.vectors[i]], [self.model_wv.vectors[j]])[0][0])
-        histo, _ = np.histogram(histo, bins=self.intvlsArray)
-        if self.normalize:
-            histo = histo / histo.sum()
-        X.append(histo)
-    if len(query.nonzero()[1]) < self.max_length_query:
-        # compléter avec des zéro
-        for i in range(self.max_length_query - len(query.nonzero()[1])):
-            X.append([0]*self.intervals)
-    #retourner histogramme interactions
-    return np.array(X)
+        for a query and a doc return the interaction histogram matrix. 
 
-def calcul_interaction(self,query,document,bins_=4,normalize=False):
+    """
+    if histo_type=='LCH':
+        mat_hist = np.array([np.log(np.histogram([cosine_similarity(query[j].reshape(1,-1),data.model_wv[i].reshape(1,-1)).item() for i in document],bins=intervals)[0]) if j < len(query) else np.zeros((intervals,)) for j in range(data.max_length_query)])
+        mat_hist[mat_hist < 0] = 0
+    else:
+
+        mat_hist = np.array([np.histogram([cosine_similarity(query[j].reshape(1,-1),data.model_wv[i].reshape(1,-1)).item() for i in document],bins=intervals)[0] if j < len(query) else np.zeros((intervals,)) for j in range(data.max_length_query)])
+        
+        if histo_type == 'NH':
+            mat_hist = np.array([i/i.sum() if i.sum()!= 0 else np.zeros(np.shape(i)) for i in mat_hist])
+        
+    return mat_hist 
+
+
+ch = histo(que_emb['301'],docs['LA070389-0001'])
+lch = histo(que_emb['301'],docs['LA070389-0001'],histo_type='LCH')
+nh = histo(que_emb['301'],docs['LA070389-0001'],histo_type='NH')
+
+def calcul_interaction(query,document,bins_=4,normalize=False):
     """
         Fonction qui calcul un histogramme d'une interaction cosinus similarité entre une query et un doc. 
         Entrée -> Embedding d'une query et d'un document.
