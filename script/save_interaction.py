@@ -5,11 +5,12 @@
 import sys
 sys.path.insert(0, '/local/karmim/Stage_M1_RI/src')
 import load_data
-import numpy as np 
+import numpy as np
+import random 
 from sklearn.metrics.pairwise import cosine_similarity
 import time
 import warnings
-
+from sklearn.model_selection import train_test_split
 if not sys.warnoptions:
     warnings.simplefilter("ignore")
 
@@ -25,18 +26,19 @@ max_length = data.max_length_query
 
 
 
-def histo( query, document,intervals=30,histo_type='CH'):
+def histo( query, document,intervals=30,max_length=5,histo_type='CH'):
     """
         for a query and a doc return the interaction histogram matrix. 
+            intervals -> number of bins in a histogram
+            histo_type -> The three types of histograms in DRMM original architecure : CH, NH, LCH.
 
     """
     if histo_type=='LCH':
-        mat_hist = np.array([np.log(np.histogram([cosine_similarity(query[j].reshape(1,-1),data.model_wv[i].reshape(1,-1)).item() for i in document],bins=intervals)[0]) if j < len(query) else np.zeros((intervals,)) for j in range(data.max_length_query)])
+        mat_hist = np.array([np.log(np.histogram([cosine_similarity(query[j].reshape(1,-1),data.model_wv[i].reshape(1,-1)).item() for i in document],bins=intervals)[0]) if j < len(query) else np.zeros((intervals,)) for j in range(max_length)])
         mat_hist[mat_hist < 0] = 0
     else:
+        mat_hist = np.array([np.histogram([cosine_similarity(query[j].reshape(1,-1),data.model_wv[i].reshape(1,-1)).item() for i in document],bins=intervals)[0] if j < len(query) else np.zeros((intervals,)) for j in range(max_length)])
 
-        mat_hist = np.array([np.histogram([cosine_similarity(query[j].reshape(1,-1),data.model_wv[i].reshape(1,-1)).item() for i in document],bins=intervals)[0] if j < len(query) else np.zeros((intervals,)) for j in range(data.max_length_query)])
-        
         if histo_type == 'NH':
             mat_hist = np.array([i/i.sum() if i.sum()!= 0 else np.zeros(np.shape(i)) for i in mat_hist])
         
@@ -44,29 +46,44 @@ def histo( query, document,intervals=30,histo_type='CH'):
 
 
 ch = histo(que_emb['301'],docs['LA070389-0001'])
-lch = histo(que_emb['301'],docs['LA070389-0001'],histo_type='LCH')
-nh = histo(que_emb['301'],docs['LA070389-0001'],histo_type='NH')
+lch = histo(que_emb['301'],docs['LA070389-0001'],histo_type='LCH') # Work well for the DRMM architecture. 
+nh = histo(que_emb['301'],docs['LA070389-0001'],histo_type='NH') # Dont work really good in the original paper.
 
-def calcul_interaction(query,document,bins_=4,normalize=False):
+def calcul_interaction_forNN(data,intervals = 30,histo_type='CH',train_size=0.8,folder_interaxion_np ="/local/karmim/Stage_M1_RI/data/object_python/interaction"):
     """
-        Fonction qui calcul un histogramme d'une interaction cosinus similarité entre une query et un doc. 
-        Entrée -> Embedding d'une query et d'un document.
-                    bins : Nombre d'intervalles dans l'histogramme.
-                    normalize : Bool pour normaliser l'histogramme. 
-        Sortie -> Renvoie une matrice d'histogramme.
+        This function compute all the interaction needed to train our Neural Network.  
+            Input -> 
+                data : object from the file load_data.py 
+                intervals : number of bins in the histogram 
+                histo_type : The type of the histogram : CH, NH or LCH.
+                train_size : % of query that are use for the train   
+            Output -> List of interaction matrix, with pos and neg examples. 
     """
-    X = []
-
-    # Calcul de similarité entre doc et query 
-    for q in query:
-        histo = []
-        for d in document:
-            histo.append(cosine_similarity(q, d)[0][0])
-        histo, _ = np.histogram(histo, bins= bins_)
-        if normalize:
-            histo = histo / histo.sum()
-        X.append(histo)
-    return np.array(X)
+    
+    relevance = data.load_relevance()
+    docs = data.load_all_docs()
+    #query = data.load_all_query()
+    que_emb = data.embedding_query()
+    max_length = data.max_length_query
+    que = np.array(list(relevance.keys())) # Split de nos query en train / test 
+    random.shuffle(que)
+    r = int(train_size*len(que))
+    train_q = que[:r]
+    test_q = que[r:]
+    #y_train = np.array([1 if i%2==0 else 0 for i in len(train_q)]) # We need an ordonate list of relevant irrelevant document...
+    #y_test = np.array([1 if i%2==0 else 0 for i in len(test_q)])
+    
+    for id_q in train_q:
+        all_interaxion_4_query = []
+        pos = np.array([histo(que_emb[id_q],doc_pos,intervals=intervals,data.max_length_query,histo_type=histo_type)\
+        for doc_pos in relevance[id_q]['relevant']])
+        all_interaxion_4_query.append(pos)
+        neg = np.array([histo(que_emb[id_q],doc_neg,intervals=intervals,data.max_length_query,histo_type=histo_type)\
+        for doc_neg in relevance[id_q]['irrelevant']])
+        all_interaxion_4_query.append(neg)
+        all_interaxion_4_query = np.array(all_interaxion_4_query)
+        np.save(folder_interaxion_np+id_requete+"_interractions.npy", all_interaxion_4_query)
+        # train append pos/ neg... 
 
 def prepare_data_forNN(self, test_size=0.2):
         """
