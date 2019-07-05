@@ -9,6 +9,7 @@ import numpy as np
 import random 
 from sklearn.metrics.pairwise import cosine_similarity
 import time
+import os 
 import warnings
 from sklearn.model_selection import train_test_split
 if not sys.warnoptions:
@@ -26,18 +27,34 @@ max_length = data.max_length_query
 
 
 
-def histo( query, document,intervals=30,max_length=5,histo_type='CH'):
+def histo( query,doc_id,data,intervals=30,max_length=5,histo_type='CH'):
     """
-        for a query and a doc return the interaction histogram matrix. 
+        for a query embedded, a doc_id and the data object return the interaction histogram matrix. 
             intervals -> number of bins in a histogram
             histo_type -> The three types of histograms in DRMM original architecure : CH, NH, LCH.
 
     """
+
+    #embedded docs 
+    doc_emb = []
+    cpt = 0
+    for i,w in enumerate(data.docs[doc_id]): 
+        #print(w) 
+        #print(type(w)) 
+        if  w in data.model_wv: 
+            doc_emb.append( data.model_wv[w] )                 
+        elif w.upper() in data.model_wv:
+            doc_emb.append( data.model_wv[w.upper()] )
+        elif w.lower() in data.model_wv:
+            doc_emb.append(data.model_wv[w.lower()])
+        else : 
+            cpt+=1
+
     if histo_type=='LCH':
-        mat_hist = np.array([np.log(np.histogram([cosine_similarity(query[j].reshape(1,-1),data.model_wv[i].reshape(1,-1)).item() for i in document],bins=intervals)[0]) if j < len(query) else np.zeros((intervals,)) for j in range(max_length)])
+        mat_hist = np.array([np.log(np.histogram([cosine_similarity(query[j].reshape(1,-1),i.reshape(1,-1)).item() for i in doc_emb],bins=intervals)[0]) if (j < len(query))  else np.zeros((intervals,)) for j in range(max_length)])
         mat_hist[mat_hist < 0] = 0
     else:
-        mat_hist = np.array([np.histogram([cosine_similarity(query[j].reshape(1,-1),data.model_wv[i].reshape(1,-1)).item() for i in document],bins=intervals)[0] if j < len(query) else np.zeros((intervals,)) for j in range(max_length)])
+        mat_hist = np.array([np.histogram([cosine_similarity(query[j].reshape(1,-1),i.reshape(1,-1)).item() for i in doc_emb],bins=intervals)[0] if j < len(query) else np.zeros((intervals,)) for j in range(max_length)])
 
         if histo_type == 'NH':
             mat_hist = np.array([i/i.sum() if i.sum()!= 0 else np.zeros(np.shape(i)) for i in mat_hist])
@@ -45,11 +62,11 @@ def histo( query, document,intervals=30,max_length=5,histo_type='CH'):
     return mat_hist 
 
 
-ch = histo(que_emb['301'],docs['LA070389-0001'])
-lch = histo(que_emb['301'],docs['LA070389-0001'],histo_type='LCH') # Work well for the DRMM architecture. 
-nh = histo(que_emb['301'],docs['LA070389-0001'],histo_type='NH') # Dont work really good in the original paper.
+ch = histo(que_emb['301'],'LA070389-0001',data)
+lch = histo(que_emb['301'],'LA070389-0001',data,histo_type='LCH') # Work well for the DRMM architecture. 
+nh = histo(que_emb['301'],'LA070389-0001',data,histo_type='NH') # Dont work really good in the original paper.
 
-def calcul_interaction_forNN(data,intervals = 30,histo_type='CH',train_size=0.8,folder_interaxion_np ="/local/karmim/Stage_M1_RI/data/object_python/interaction"):
+def calcul_all_interaction_forNN(data,intervals = 30,histo_type='CH',train_size=0.8,folder_interaxion_np ="/local/karmim/Stage_M1_RI/data/object_python/interaction"):
     """
         This function compute all the interaction needed to train our Neural Network.  
             Input -> 
@@ -61,29 +78,57 @@ def calcul_interaction_forNN(data,intervals = 30,histo_type='CH',train_size=0.8,
     """
     
     relevance = data.load_relevance()
-    docs = data.load_all_docs()
+    #docs = data.load_all_docs()
     #query = data.load_all_query()
     que_emb = data.embedding_query()
     max_length = data.max_length_query
     que = np.array(list(relevance.keys())) # Split de nos query en train / test 
     random.shuffle(que)
     r = int(train_size*len(que))
-    train_q = que[:r]
-    test_q = que[r:]
+    train_q = que[:r] # List of training queries id 
+    test_q = que[r:]  # List of testing queries id
+    train_X = {}   # List of all interaxion matrix from the train
+    test_X = {}    # List of all interaxion matrix from the test
     #y_train = np.array([1 if i%2==0 else 0 for i in len(train_q)]) # We need an ordonate list of relevant irrelevant document...
     #y_test = np.array([1 if i%2==0 else 0 for i in len(test_q)])
-    
+    # train_X[query][0] = all the pos interaction train_X[query][1] all the neg interaxion...
     for id_q in train_q:
-        all_interaxion_4_query = []
-        pos = np.array([histo(que_emb[id_q],doc_pos,intervals=intervals,data.max_length_query,histo_type=histo_type)\
-        for doc_pos in relevance[id_q]['relevant']])
-        all_interaxion_4_query.append(pos)
-        neg = np.array([histo(que_emb[id_q],doc_neg,intervals=intervals,data.max_length_query,histo_type=histo_type)\
-        for doc_neg in relevance[id_q]['irrelevant']])
-        all_interaxion_4_query.append(neg)
-        all_interaxion_4_query = np.array(all_interaxion_4_query)
-        np.save(folder_interaxion_np+id_requete+"_interractions.npy", all_interaxion_4_query)
-        # train append pos/ neg... 
+        exists = os.path.isfile(folder_interaxion_np+id_q+"_interractions.npy")
+        if not exists : 
+            all_interaxion_4_query = []
+            pos = np.array([histo(que_emb[id_q],doc_pos,data,intervals=intervals,max_length=max_length,histo_type=histo_type) for doc_pos in relevance[id_q]['relevant']])
+            all_interaxion_4_query.append(pos)
+            neg = np.array([histo(que_emb[id_q],doc_neg,data,intervals=intervals,max_length=max_length,histo_type=histo_type) for doc_neg in relevance[id_q]['irrelevant']])
+            all_interaxion_4_query.append(neg)
+            all_interaxion_4_query = np.array(all_interaxion_4_query)
+            train_X[id_q] = all_interaxion_4_query
+            np.save(folder_interaxion_np+id_q+"_interractions.npy", all_interaxion_4_query)
+            print(folder_interaxion_np+id_q+"_interractions.npy succesfully saved.")
+        else:
+            all_interaxion_4_query = np.load(folder_interaxion_np+id_q+"_interractions.npy")
+            train_X[id_q] = all_interaxion_4_query
+            print(folder_interaxion_np+id_q+"_interractions.npy succesfully loaded.")
+
+    for id_q in test_q:
+        exists = os.path.isfile(folder_interaxion_np+id_q+"_interractions.npy")
+        if not exists : 
+            all_interaxion_4_query = []
+            pos = np.array([histo(que_emb[id_q],doc_pos,data,intervals=intervals,max_length=max_length,histo_type=histo_type) for doc_pos in relevance[id_q]['relevant']])
+            all_interaxion_4_query.append(pos)
+            neg = np.array([histo(que_emb[id_q],doc_neg,data,intervals=intervals,max_length=max_length,histo_type=histo_type) for doc_neg in relevance[id_q]['irrelevant']])
+            all_interaxion_4_query.append(neg)
+            all_interaxion_4_query = np.array(all_interaxion_4_query)
+            test_X[id_q] = all_interaxion_4_query
+            np.save(folder_interaxion_np+id_q+"_interractions.npy", all_interaxion_4_query)
+            print(folder_interaxion_np+id_q+"_interractions.npy succesfully saved.")
+        else:
+            all_interaxion_4_query = np.load(folder_interaxion_np+id_q+"_interractions.npy")
+            test_X[id_q] = all_interaxion_4_query
+            print(folder_interaxion_np+id_q+"_interractions.npy succesfully loaded.")
+    return train_X,test_X
+
+
+calcul_all_interaction_forNN(data,intervals = 30,histo_type='CH',train_size=0.8,folder_interaxion_np ="/local/karmim/Stage_M1_RI/data/object_python/interaction")
 
 def prepare_data_forNN(self, test_size=0.2):
         """
