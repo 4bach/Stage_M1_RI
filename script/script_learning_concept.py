@@ -16,7 +16,7 @@ import numpy as np
 import matplotlib.pyplot as plt 
 import pandas as pd 
 import seaborn as sns
-
+from gensim.parsing.preprocessing import preprocess_string,remove_stopwords,strip_numeric, strip_tags, strip_punctuation
 
 def load_all_path_docs_robust4(folder="/local/karmim/Stage_M1_RI/data/annotated_collection_tagme_score/015"):
         """
@@ -97,12 +97,47 @@ def load_all_doc(all_file,doc_json="/local/karmim/Stage_M1_RI/data/object_python
     return all_doc,all_concept
 
 
-ad,ac = load_all_doc(all_file_name)
-save = json.dumps(ad)
-f = open("/local/karmim/Stage_M1_RI/data/object_python/concept_part/anotated_doc.json","w")
-f.write(save)
-f.close()
-save = json.dumps(ac)
-f = open("/local/karmim/Stage_M1_RI/data/object_python/concept_part/all_concept_doc.json","w")
-f.write(save)
-f.close()
+def pre_process_doc(all_document={},all_concept={},CUSTOM_FILTERS = [lambda x: x.lower(),remove_stopwords],json_doc_preprocess="/local/karmim/Stage_M1_RI/data/object_python/concept_part/preprocess_doc.json",json_concept_preprocess="/local/karmim/Stage_M1_RI/data/object_python/concept_part/preprocess_concept.json"):
+    exists1 = os.path.isfile(json_doc_preprocess)
+    exists2 = os.path.isfile(json_concept_preprocess)
+    if not exists1 or not exists2:
+        for k in all_document : 
+            all_document[k] = preprocess_string(' '.join(all_document[k]),CUSTOM_FILTERS)
+            all_concept[k] = preprocess_string(' '.join(all_document[k]),[lambda x : x.lower()]) # We only need to low the concept
+        
+        save = json.dumps(all_document)
+        f = open(json_doc_preprocess,"w")
+        f.write(save)
+        f.close()
+        print("document annoté preprocessé sauvegardé...")
+        save = json.dumps(all_concept)
+        f = open(json_concept_preprocess,"w")
+        f.write(save)
+        f.close()
+        print("concept des documents preprocessé sauvegardé...")
+    
+    else:     
+        print("Chargement du fichier json : preprocess_doc.json ...")
+        with open(json_doc_preprocess) as json_file:
+            all_document = json.load(json_file)
+        print("Chargement du fichier json : preprocess_concept.json ...")
+        with open(json_concept_preprocess) as json_file:
+            all_concept = json.load(json_file)
+        
+        
+    return all_document,all_concept
+
+def count_concept(ac):
+    all_concept = []
+    for k in ac: 
+        for w in ac[k]:
+            all_concept.append(w)
+
+    unique, counts = np.unique(all_concept, return_counts=True)
+    dico_concept = dict(zip(unique, counts))
+    return np.array(all_concept),dico_concept
+
+
+
+
+ad,ac = pre_process_doc()
