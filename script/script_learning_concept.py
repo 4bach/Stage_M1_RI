@@ -151,9 +151,9 @@ def count_concept(ac):
 
 if __name__ == "__main__":
 
-    all_file_name = load_all_path_docs_robust4()
-    q,c = load_all_query_annotated_robust4()
-    ad,ac = pre_process_doc()
+    #all_file_name = load_all_path_docs_robust4()
+    q,c = load_all_query_annotated_robust4(file="/home/karmim/semantic_deep_neuralIR/data/topics-title.annotated.csv")
+    ad,ac = pre_process_doc(json_doc_preprocess="/home/karmim/semantic_deep_neuralIR/data/preprocess_doc.json",json_concept_preprocess="/home/karmim/semantic_deep_neuralIR/data/preprocess_concept.json")
     
 
     
