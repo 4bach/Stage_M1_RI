@@ -12,6 +12,7 @@ import time
 import os 
 import warnings
 from sklearn.model_selection import train_test_split
+from sklearn.metrics.pairwise import cosine_similarity
 if not sys.warnoptions:
     warnings.simplefilter("ignore")
 
@@ -22,8 +23,8 @@ docs = data.load_all_docs()
 query = data.load_all_query()
 que_emb = data.embedding_query()
 max_length = data.max_length_query
-#cosine_similarity(data.model_wv['car'].reshape(1,-1),data.model_wv['truck'].reshape(1,-1)).item()
-#hist = np.array([cosine_similarity(que_emb['301'][0].reshape(1,-1),data.model_wv[i].reshape(1,-1)).item() for i in docs['LA070389-0001']]) 
+cosine_similarity(data.model_wv['car'].reshape(1,-1),data.model_wv['truck'].reshape(1,-1)).item()
+hist = np.array([cosine_similarity(que_emb['301'][0].reshape(1,-1),data.model_wv[i].reshape(1,-1)).item() for i in docs['LA070389-0001']]) 
 
 
 
@@ -50,11 +51,14 @@ def histo( query,doc_id,data,intervals=30,max_length=5,histo_type='CH'):
         else : 
             cpt+=1
 
+    doc_emb = np.array(doc_emb)
     if histo_type=='LCH':
-        mat_hist = np.array([np.log(np.histogram([cosine_similarity(query[j].reshape(1,-1),i.reshape(1,-1)).item() for i in doc_emb],bins=intervals)[0]) if (j < len(query))  else np.zeros((intervals,)) for j in range(max_length)])
+        cos = cosine_similarity(query,doc_emb)
+        mat_hist = np.array([np.log([np.histogram(cos[j],bins=intervals)[0] if (j < len(query))  else np.zeros((intervals,)) for j in range(max_length)])])
         mat_hist[mat_hist < 0] = 0
     else:
-        mat_hist = np.array([np.histogram([cosine_similarity(query[j].reshape(1,-1),i.reshape(1,-1)).item() for i in doc_emb],bins=intervals)[0] if j < len(query) else np.zeros((intervals,)) for j in range(max_length)])
+        cos = cosine_similarity(query,doc_emb)
+        mat_hist = np.array([np.histogram(cos[j],bins=intervals)[0] if j < len(query) else np.zeros((intervals,)) for j in range(max_length)])
 
         if histo_type == 'NH':
             mat_hist = np.array([i/i.sum() if i.sum()!= 0 else np.zeros(np.shape(i)) for i in mat_hist])
@@ -128,7 +132,7 @@ def calcul_all_interaction_forNN(data,intervals = 30,histo_type='CH',train_size=
     return train_X,test_X
 
 
-calcul_all_interaction_forNN(data,intervals = 30,histo_type='CH',train_size=0.8,folder_interaxion_np ="/local/karmim/Stage_M1_RI/data/object_python/interaction")
+#calcul_all_interaction_forNN(data,intervals = 30,histo_type='CH',train_size=0.8,folder_interaxion_np ="/local/karmim/Stage_M1_RI/data/object_python/interaction")
 
 def prepare_data_forNN(self, test_size=0.2):
         """
