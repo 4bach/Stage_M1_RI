@@ -9,3 +9,5 @@ src/trash/
 src/trash
 src/__pycache__/
 isma/
+notebook/.ipynb_checkpoints/concept_learning_robust4-checkpoint.ipynb
+*.ipynb_checkpoints*

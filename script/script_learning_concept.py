@@ -4,6 +4,7 @@ import glob
 import logging 
 import multiprocessing
 import os 
+import sys
 import pprint
 import re
 import ast
@@ -29,9 +30,9 @@ def load_all_path_docs_robust4(folder="/local/karmim/Stage_M1_RI/data/annotated_
                 all_file_name.append(os.path.join(r,file))
         return all_file_name
 
-all_file_name = load_all_path_docs_robust4()
 
-def load_all_query_annotated_robust4(file = '/local/karmim/Stage_M1_RI/data/topics-title.annotated.csv'):
+
+def load_all_query_annotated_robust4(file = '/local/karmim/Stage_M1_RI/data/topics-title.annotated.csv',pre_process=True,CUSTOM_FILTERS=[lambda x: x.lower(),remove_stopwords],delete_meaning=False):
     query_an = {} # Dict with words and concept for a query id
     concept = {} # Dict with only the concept for a query id
     f = codecs.open(file,'r',encoding='utf-8',errors='ignore')
@@ -39,11 +40,20 @@ def load_all_query_annotated_robust4(file = '/local/karmim/Stage_M1_RI/data/topi
         #print(line.split())
         line = np.array(line.split())
         index = np.where(np.char.find(line, '$#')>=0)
-        concept[line[0]] = line[index]
-        query_an[line[0]] = line[1:]
+        concept[line[0]] = list(line[index])
+        query_an[line[0]] = list(line[1:])
+        
+        if delete_meaning : 
+            concept[line[0]] = [ w[:-5] for w in concept[line[0]] ]
+            query_an[line[0]] = [w[:-5] if '$#' in w else w for w in query_an[line[0]] ]
+        if pre_process:
+            for k in query_an : 
+                query_an[k] = preprocess_string(' '.join(query_an[k]),CUSTOM_FILTERS)
+                concept[k] = preprocess_string(' '.join(concept[k]),[lambda x : x.lower()]) 
+            
     return query_an,concept
 
-q,c = load_all_query_annotated_robust4()
+
 
 
 def load_doc(file_doc,all_docs={},all_concept={},pre_process=True):
@@ -139,5 +149,95 @@ def count_concept(ac):
 
 
 
+if __name__ == "__main__":
 
-ad,ac = pre_process_doc()
+    all_file_name = load_all_path_docs_robust4()
+    q,c = load_all_query_annotated_robust4()
+    ad,ac = pre_process_doc()
+    
+
+    
+    try :
+        if sys.argv[1].lower() =='allrobust':
+            print("All the concept and terms are going to be learned...")
+            num_features = 300
+            min_word_count = 1 
+            num_workers = multiprocessing.cpu_count()
+            context_size = 30 
+            downsampling = 1e-3
+            seed = 1
+
+            allRobustConcept2v = w2v.Word2Vec(
+            sg=1,
+            seed=seed,
+            workers=num_workers,
+            size=num_features,
+            min_count=min_word_count,
+            window=context_size,
+            sample=downsampling,
+            )
+            
+            try:
+                pathw2v=sys.argv[2].lower()
+            except IndexError:
+                pathw2v = "/local/karmim/Stage_M1_RI/data/object_python/concept_part"
+            path_all_concept = os.path.join(pathw2v, "allRobustConcept2v.w2v")
+            exists = os.path.isfile(path_all_concept)
+            if exists:
+                allRobustConcept2v = w2v.Word2Vec.load(path_all_concept)
+
+            else:
+                allRobustConcept2v.build_vocab(list(ad.values())) # We need list of sentences (doc) 
+                print("Building vocabulary, done.")
+                allRobustConcept2v.train(list(ad.values()),total_examples=allRobustConcept2v.corpus_count,epochs=7)
+                print("Training model, done.")
+                allRobustConcept2v.save(path_all_concept)
+        
+        if sys.argv[1].lower() =='low_frequency':
+            print("Low frequency deleted...")
+            num_features = 300
+            min_word_count = 5 # no
+            num_workers = multiprocessing.cpu_count()
+            context_size = 30 
+            downsampling = 1e-3
+            seed = 1
+
+            allRobustConcept2v = w2v.Word2Vec(
+            sg=1,
+            seed=seed,
+            workers=num_workers,
+            size=num_features,
+            min_count=min_word_count,
+            window=context_size,
+            sample=downsampling,
+            )
+            try:
+                pathw2v=sys.argv[2].lower()
+            except IndexError:
+                pathw2v = "/local/karmim/Stage_M1_RI/data/object_python/concept_part"
+            
+            path_all_concept = os.path.join(pathw2v, "no_low_frequencyRobustConcept2v.w2v")
+            exists = os.path.isfile(path_all_concept)
+            if exists:
+                allRobustConcept2v = w2v.Word2Vec.load(path_all_concept)
+
+            else:
+                allRobustConcept2v.build_vocab(list(ad.values())) # We need list of sentences (doc) 
+                print("Building vocabulary, done.")
+                allRobustConcept2v.train(list(ad.values()),total_examples=allRobustConcept2v.corpus_count,epochs=7)
+                print("Training model, done.")
+                allRobustConcept2v.save(path_all_concept)
+        
+        if sys.argv[1].lower() =='ppmi':
+            print("no implemented yet")
+            try:
+                pathw2v=sys.argv[2].lower()
+            except IndexError:
+                pathw2v = "/local/karmim/Stage_M1_RI/data/object_python/concept_part"
+    
+    
+    except IndexError:
+        print("please put one of the following option \
+        :\n   'allrobust' 'saving_path'(optionnaly) for the concept + terms model \n   \
+        'low_frequency' 'saving_path'(optionnaly) for the model who delete the low frequency terms \n\
+        'ppmi' 'saving_path'(optionnaly) for the ppmi model. ")  
