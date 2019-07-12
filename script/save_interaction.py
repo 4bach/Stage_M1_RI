@@ -17,14 +17,7 @@ if not sys.warnoptions:
     warnings.simplefilter("ignore")
 
 
-data = load_data.Dataset()
-relevance = data.load_relevance()
-docs = data.load_all_docs()
-query = data.load_all_query()
-que_emb = data.embedding_query()
-max_length = data.max_length_query
-cosine_similarity(data.model_wv['car'].reshape(1,-1),data.model_wv['truck'].reshape(1,-1)).item()
-hist = np.array([cosine_similarity(que_emb['301'][0].reshape(1,-1),data.model_wv[i].reshape(1,-1)).item() for i in docs['LA070389-0001']]) 
+ 
 
 
 
@@ -66,9 +59,7 @@ def histo( query,doc_id,data,intervals=30,max_length=5,histo_type='CH'):
     return mat_hist 
 
 
-ch = histo(que_emb['301'],'LA070389-0001',data)
-lch = histo(que_emb['301'],'LA070389-0001',data,histo_type='LCH') # Work well for the DRMM architecture. 
-nh = histo(que_emb['301'],'LA070389-0001',data,histo_type='NH') # Dont work really good in the original paper.
+
 
 def calcul_all_interaction_forNN(data,intervals = 30,histo_type='CH',train_size=0.8,folder_interaxion_np ="/local/karmim/Stage_M1_RI/data/object_python/interaction"):
     """
@@ -106,12 +97,12 @@ def calcul_all_interaction_forNN(data,intervals = 30,histo_type='CH',train_size=
             all_interaxion_4_query.append(neg)
             all_interaxion_4_query = np.array(all_interaxion_4_query)
             train_X[id_q] = all_interaxion_4_query
-            np.save(folder_interaxion_np+id_q+"_interractions.npy", all_interaxion_4_query)
-            print(folder_interaxion_np+id_q+"_interractions.npy succesfully saved.")
+            np.save(folder_interaxion_np+id_q+histo_type+"_interractions.npy", all_interaxion_4_query)
+            print(folder_interaxion_np+id_q+histo_type+"_interractions.npy succesfully saved.")
         else:
-            all_interaxion_4_query = np.load(folder_interaxion_np+id_q+"_interractions.npy")
+            all_interaxion_4_query = np.load(folder_interaxion_np+id_q+histo_type+"_interractions.npy")
             train_X[id_q] = all_interaxion_4_query
-            print(folder_interaxion_np+id_q+"_interractions.npy succesfully loaded.")
+            print(folder_interaxion_np+id_q+histo_type+"_interractions.npy succesfully loaded.")
 
     for id_q in test_q:
         exists = os.path.isfile(folder_interaxion_np+id_q+"_interractions.npy")
@@ -123,16 +114,16 @@ def calcul_all_interaction_forNN(data,intervals = 30,histo_type='CH',train_size=
             all_interaxion_4_query.append(neg)
             all_interaxion_4_query = np.array(all_interaxion_4_query)
             test_X[id_q] = all_interaxion_4_query
-            np.save(folder_interaxion_np+id_q+"_interractions.npy", all_interaxion_4_query)
-            print(folder_interaxion_np+id_q+"_interractions.npy succesfully saved.")
+            np.save(folder_interaxion_np+id_q+histo_type+"_interractions.npy", all_interaxion_4_query)
+            print(folder_interaxion_np+id_q+histo_type+"_interractions.npy succesfully saved.")
         else:
-            all_interaxion_4_query = np.load(folder_interaxion_np+id_q+"_interractions.npy")
+            all_interaxion_4_query = np.load(folder_interaxion_np+id_q+histo_type+"_interractions.npy")
             test_X[id_q] = all_interaxion_4_query
-            print(folder_interaxion_np+id_q+"_interractions.npy succesfully loaded.")
+            print(folder_interaxion_np+id_q+histo_type+"_interractions.npy succesfully loaded.")
     return train_X,test_X
 
 
-#calcul_all_interaction_forNN(data,intervals = 30,histo_type='CH',train_size=0.8,folder_interaxion_np ="/local/karmim/Stage_M1_RI/data/object_python/interaction")
+
 
 def prepare_data_forNN(self, test_size=0.2):
         """
@@ -193,3 +184,18 @@ def prepare_data_forNN(self, test_size=0.2):
     # return (train_hist, train_idf, train_labels), (test_hist, test_idf, test_labels)
     
     # #éventuellement sauvegarder tout ça sur le disque comme ça c fait une bonne fois pour toutes...
+
+if __name__ == "__main__":
+    data = load_data.Dataset()
+    relevance = data.load_relevance()
+    docs = data.load_all_docs()
+    query = data.load_all_query()
+    que_emb = data.embedding_query()
+    max_length = data.max_length_query
+    cosine_similarity(data.model_wv['car'].reshape(1,-1),data.model_wv['truck'].reshape(1,-1)).item()
+    hist = np.array([cosine_similarity(que_emb['301'][0].reshape(1,-1),data.model_wv[i].reshape(1,-1)).item() for i in docs['LA070389-0001']])
+    ch = histo(que_emb['301'],'LA070389-0001',data)
+    lch = histo(que_emb['301'],'LA070389-0001',data,histo_type='LCH') # Work well for the DRMM architecture. 
+    nh = histo(que_emb['301'],'LA070389-0001',data,histo_type='NH') # Dont work really good in the original paper.
+    calcul_all_interaction_forNN(data,intervals = 30,histo_type='CH',train_size=0.8,folder_interaxion_np ="/local/karmim/Stage_M1_RI/data/object_python/interaction")
+    

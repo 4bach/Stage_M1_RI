@@ -152,8 +152,8 @@ def count_concept(ac):
 if __name__ == "__main__":
 
     #all_file_name = load_all_path_docs_robust4()
-    q,c = load_all_query_annotated_robust4(file="/home/karmim/semantic_deep_neuralIR/data/topics-title.annotated.csv")
-    ad,ac = pre_process_doc(json_doc_preprocess="/home/karmim/semantic_deep_neuralIR/data/preprocess_doc.json",json_concept_preprocess="/home/karmim/semantic_deep_neuralIR/data/preprocess_concept.json")
+    q,c = load_all_query_annotated_robust4()
+    ad,ac = pre_process_doc()
     
 
     
@@ -180,11 +180,12 @@ if __name__ == "__main__":
             try:
                 pathw2v=sys.argv[2].lower()
             except IndexError:
-                pathw2v = "/local/karmim/Stage_M1_RI/data/object_python/concept_part"
+                pathw2v = "/local/karmim/Stage_M1_RI/data/object_python/concept_part/modelw2v"
             path_all_concept = os.path.join(pathw2v, "allRobustConcept2v.w2v")
             exists = os.path.isfile(path_all_concept)
             if exists:
                 allRobustConcept2v = w2v.Word2Vec.load(path_all_concept)
+                print("Success loading all Robust concept model.")
 
             else:
                 allRobustConcept2v.build_vocab(list(ad.values())) # We need list of sentences (doc) 
@@ -212,14 +213,15 @@ if __name__ == "__main__":
             sample=downsampling,
             )
             try:
-                pathw2v=sys.argv[2].lower()
+                pathw2v=sys.argv[2]
             except IndexError:
-                pathw2v = "/local/karmim/Stage_M1_RI/data/object_python/concept_part"
+                pathw2v = "/local/karmim/Stage_M1_RI/data/object_python/concept_part/modelw2v"
             
             path_all_concept = os.path.join(pathw2v, "no_low_frequencyRobustConcept2v.w2v")
             exists = os.path.isfile(path_all_concept)
             if exists:
                 allRobustConcept2v = w2v.Word2Vec.load(path_all_concept)
+                print("Success to load no low frequency model.")
 
             else:
                 allRobustConcept2v.build_vocab(list(ad.values())) # We need list of sentences (doc) 
@@ -233,7 +235,7 @@ if __name__ == "__main__":
             try:
                 pathw2v=sys.argv[2].lower()
             except IndexError:
-                pathw2v = "/local/karmim/Stage_M1_RI/data/object_python/concept_part"
+                pathw2v = "/local/karmim/Stage_M1_RI/data/object_python/concept_part/modelw2v"
     
     
     except IndexError:
