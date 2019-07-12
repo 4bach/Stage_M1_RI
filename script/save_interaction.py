@@ -46,12 +46,23 @@ def histo( query,doc_id,data,intervals=30,max_length=5,histo_type='CH'):
 
     doc_emb = np.array(doc_emb)
     if histo_type=='LCH':
-        cos = cosine_similarity(query,doc_emb)
-        mat_hist = np.array([np.log([np.histogram(cos[j],bins=intervals)[0] if (j < len(query))  else np.zeros((intervals,)) for j in range(max_length)])])
-        mat_hist[mat_hist < 0] = 0
+        try:
+            cos = cosine_similarity(query,doc_emb)
+            mat_hist = np.array([np.log([np.histogram(cos[j],bins=intervals)[0] if (j < len(query))  else np.zeros((intervals,)) for j in range(max_length)])])
+            mat_hist[mat_hist < 0] = 0
+        except ValueError:
+            print("query :",query)
+            print("doc :",doc_emb)
+
     else:
-        cos = cosine_similarity(query,doc_emb)
-        mat_hist = np.array([np.histogram(cos[j],bins=intervals)[0] if j < len(query) else np.zeros((intervals,)) for j in range(max_length)])
+        try:
+            cos = cosine_similarity(query,doc_emb)
+            mat_hist = np.array([np.histogram(cos[j],bins=intervals)[0] if j < len(query) else np.zeros((intervals,)) for j in range(max_length)])
+            
+        except ValueError:
+            print("query :",query)
+            print("doc :",doc_emb)
+        
 
         if histo_type == 'NH':
             mat_hist = np.array([i/i.sum() if i.sum()!= 0 else np.zeros(np.shape(i)) for i in mat_hist])
@@ -61,7 +72,7 @@ def histo( query,doc_id,data,intervals=30,max_length=5,histo_type='CH'):
 
 
 
-def calcul_all_interaction_forNN(data,intervals = 30,histo_type='CH',train_size=0.8,folder_interaxion_np ="/local/karmim/Stage_M1_RI/data/object_python/interaction"):
+def calcul_all_interaction_forNN(data,intervals = 30,histo_type='CH',train_size=0.8,folder_interaxion_np ="/local/karmim/Stage_M1_RI/data/object_python/interaction/"):
     """
         This function compute all the interaction needed to train our Neural Network.  
             Input -> 
@@ -73,7 +84,7 @@ def calcul_all_interaction_forNN(data,intervals = 30,histo_type='CH',train_size=
     """
     
     relevance = data.load_relevance()
-    #docs = data.load_all_docs()
+    data.load_all_docs()
     #query = data.load_all_query()
     que_emb = data.embedding_query()
     max_length = data.max_length_query
@@ -88,7 +99,7 @@ def calcul_all_interaction_forNN(data,intervals = 30,histo_type='CH',train_size=
     #y_test = np.array([1 if i%2==0 else 0 for i in len(test_q)])
     # train_X[query][0] = all the pos interaction train_X[query][1] all the neg interaxion...
     for id_q in train_q:
-        exists = os.path.isfile(folder_interaxion_np+id_q+"_interractions.npy")
+        exists = os.path.isfile(folder_interaxion_np+id_q+histo_type+"_interractions.npy")
         if not exists : 
             all_interaxion_4_query = []
             pos = np.array([histo(que_emb[id_q],doc_pos,data,intervals=intervals,max_length=max_length,histo_type=histo_type) for doc_pos in relevance[id_q]['relevant']])
@@ -105,7 +116,7 @@ def calcul_all_interaction_forNN(data,intervals = 30,histo_type='CH',train_size=
             print(folder_interaxion_np+id_q+histo_type+"_interractions.npy succesfully loaded.")
 
     for id_q in test_q:
-        exists = os.path.isfile(folder_interaxion_np+id_q+"_interractions.npy")
+        exists = os.path.isfile(folder_interaxion_np+id_q+histo_type+"_interractions.npy")
         if not exists : 
             all_interaxion_4_query = []
             pos = np.array([histo(que_emb[id_q],doc_pos,data,intervals=intervals,max_length=max_length,histo_type=histo_type) for doc_pos in relevance[id_q]['relevant']])
@@ -187,15 +198,14 @@ def prepare_data_forNN(self, test_size=0.2):
 
 if __name__ == "__main__":
     data = load_data.Dataset()
-    relevance = data.load_relevance()
-    docs = data.load_all_docs()
-    query = data.load_all_query()
-    que_emb = data.embedding_query()
-    max_length = data.max_length_query
-    cosine_similarity(data.model_wv['car'].reshape(1,-1),data.model_wv['truck'].reshape(1,-1)).item()
-    hist = np.array([cosine_similarity(que_emb['301'][0].reshape(1,-1),data.model_wv[i].reshape(1,-1)).item() for i in docs['LA070389-0001']])
-    ch = histo(que_emb['301'],'LA070389-0001',data)
-    lch = histo(que_emb['301'],'LA070389-0001',data,histo_type='LCH') # Work well for the DRMM architecture. 
-    nh = histo(que_emb['301'],'LA070389-0001',data,histo_type='NH') # Dont work really good in the original paper.
-    calcul_all_interaction_forNN(data,intervals = 30,histo_type='CH',train_size=0.8,folder_interaxion_np ="/local/karmim/Stage_M1_RI/data/object_python/interaction")
-    
+    #relevance = data.load_relevance()
+    #docs = data.load_all_docs()
+    #query = data.load_all_query()
+    #que_emb = data.embedding_query()
+    #max_length = data.max_length_query
+    #cosine_similarity(data.model_wv['car'].reshape(1,-1),data.model_wv['truck'].reshape(1,-1)).item()
+    #hist = np.array([cosine_similarity(que_emb['301'][0].reshape(1,-1),data.model_wv[i].reshape(1,-1)).item() for i in docs['LA070389-0001']])
+    #ch = histo(que_emb['301'],'LA070389-0001',data)
+    #lch = histo(que_emb['301'],'LA070389-0001',data,histo_type='LCH') # Work well for the DRMM architecture. 
+    #nh = histo(que_emb['301'],'LA070389-0001',data,histo_type='NH') # Dont work really good in the original paper.
+    calcul_all_interaction_forNN(data,intervals = 30,histo_type='LCH',train_size=0.8,folder_interaxion_np ="/local/karmim/Stage_M1_RI/data/object_python/interaction/no_concept/")

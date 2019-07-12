@@ -248,13 +248,12 @@ class Dataset:
         cpt=0
         if not exists : 
             for k in self.d_query: 
-                for i,w in enumerate(self.d_query[k]): 
-                #print(w) 
-                #print(type(w)) 
+                for i,w in enumerate(self.d_query[k]):  
                  if  w in self.model_wv: 
                     self.query_emb[k][i] = self.model_wv[w]
                     
                 else:
+                    self.query_emb[k].pop(i)
                     cpt+=1
             print("Nombre de mots ignorés :",cpt)
             pickle.dump( self.query_emb, open( file_pkl, "wb" ) )

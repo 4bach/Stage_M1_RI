@@ -21,6 +21,6 @@ data.get_doc('FBIS4-11528')
 data.get_relevance('302')
 
 data.embedding_query()
-data.embedding_doc()
+#data.embedding_doc()
 print("\n----     EMBEDDINGS QUERY TERMINÉ       ----\n")
 
