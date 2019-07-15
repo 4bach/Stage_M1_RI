@@ -8,6 +8,7 @@ import os
 import pickle
 import time
 import torch
+import copy
 import progressbar
 import codecs
 from gensim.models import KeyedVectors
@@ -244,17 +245,18 @@ class Dataset:
             Fonction qui transforme nos mots du dictionnaire de query par des embeddings (vecteurs).
         """
         exists = os.path.isfile(file_pkl)
-        self.query_emb = self.d_query.copy()
+        self.query_emb = copy.deepcopy(self.d_query)
         cpt=0
         if not exists : 
-            for k in self.d_query: 
-                for i,w in enumerate(self.d_query[k]):  
-                 if  w in self.model_wv: 
-                    self.query_emb[k][i] = self.model_wv[w]
-                    
-                else:
-                    self.query_emb[k].pop(i)
-                    cpt+=1
+            for k in self.d_query:
+                self.query_emb[k] = [] 
+                for w in self.d_query[k]:  
+                    if  w in self.model_wv: 
+                        self.query_emb[k].append(self.model_wv[w])
+                        
+                    else:
+                        
+                        cpt+=1
             print("Nombre de mots ignorés :",cpt)
             pickle.dump( self.query_emb, open( file_pkl, "wb" ) )
             print("Le fichier emb_query.pkl a bien été enregistré.")

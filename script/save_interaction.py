@@ -21,7 +21,7 @@ if not sys.warnoptions:
 
 
 
-def histo( query,doc_id,data,intervals=30,max_length=5,histo_type='CH'):
+def histo( query_id,doc_id,data,intervals=30,max_length=5,histo_type='CH'):
     """
         for a query embedded, a doc_id and the data object return the interaction histogram matrix. 
             intervals -> number of bins in a histogram
@@ -45,13 +45,14 @@ def histo( query,doc_id,data,intervals=30,max_length=5,histo_type='CH'):
             cpt+=1
 
     doc_emb = np.array(doc_emb)
+    query = data.query_emb[query_id]
     if histo_type=='LCH':
         try:
             cos = cosine_similarity(query,doc_emb)
             mat_hist = np.array([np.log([np.histogram(cos[j],bins=intervals)[0] if (j < len(query))  else np.zeros((intervals,)) for j in range(max_length)])])
             mat_hist[mat_hist < 0] = 0
         except ValueError:
-            print("query :",query)
+            print("query :",query_id)
             print("doc :",doc_emb)
 
     else:
@@ -85,8 +86,6 @@ def calcul_all_interaction_forNN(data,intervals = 30,histo_type='CH',train_size=
     
     relevance = data.load_relevance()
     data.load_all_docs()
-    #query = data.load_all_query()
-    que_emb = data.embedding_query()
     max_length = data.max_length_query
     que = np.array(list(relevance.keys())) # Split de nos query en train / test 
     random.shuffle(que)
@@ -102,16 +101,16 @@ def calcul_all_interaction_forNN(data,intervals = 30,histo_type='CH',train_size=
         exists = os.path.isfile(folder_interaxion_np+id_q+histo_type+"_interractions.npy")
         if not exists : 
             all_interaxion_4_query = []
-            pos = np.array([histo(que_emb[id_q],doc_pos,data,intervals=intervals,max_length=max_length,histo_type=histo_type) for doc_pos in relevance[id_q]['relevant']])
+            pos = np.array([histo(id_q,doc_pos,data,intervals=intervals,max_length=max_length,histo_type=histo_type) for doc_pos in relevance[id_q]['relevant']])
             all_interaxion_4_query.append(pos)
-            neg = np.array([histo(que_emb[id_q],doc_neg,data,intervals=intervals,max_length=max_length,histo_type=histo_type) for doc_neg in relevance[id_q]['irrelevant']])
+            neg = np.array([histo(id_q,doc_neg,data,intervals=intervals,max_length=max_length,histo_type=histo_type) for doc_neg in relevance[id_q]['irrelevant']])
             all_interaxion_4_query.append(neg)
             all_interaxion_4_query = np.array(all_interaxion_4_query)
             train_X[id_q] = all_interaxion_4_query
             np.save(folder_interaxion_np+id_q+histo_type+"_interractions.npy", all_interaxion_4_query)
             print(folder_interaxion_np+id_q+histo_type+"_interractions.npy succesfully saved.")
         else:
-            all_interaxion_4_query = np.load(folder_interaxion_np+id_q+histo_type+"_interractions.npy")
+            all_interaxion_4_query = np.load(folder_interaxion_np+id_q+histo_type+"_interractions.npy",allow_pickle=True)
             train_X[id_q] = all_interaxion_4_query
             print(folder_interaxion_np+id_q+histo_type+"_interractions.npy succesfully loaded.")
 
@@ -119,18 +118,19 @@ def calcul_all_interaction_forNN(data,intervals = 30,histo_type='CH',train_size=
         exists = os.path.isfile(folder_interaxion_np+id_q+histo_type+"_interractions.npy")
         if not exists : 
             all_interaxion_4_query = []
-            pos = np.array([histo(que_emb[id_q],doc_pos,data,intervals=intervals,max_length=max_length,histo_type=histo_type) for doc_pos in relevance[id_q]['relevant']])
+            pos = np.array([histo(id_q,doc_pos,data,intervals=intervals,max_length=max_length,histo_type=histo_type) for doc_pos in relevance[id_q]['relevant']])
             all_interaxion_4_query.append(pos)
-            neg = np.array([histo(que_emb[id_q],doc_neg,data,intervals=intervals,max_length=max_length,histo_type=histo_type) for doc_neg in relevance[id_q]['irrelevant']])
+            neg = np.array([histo(id_q,doc_neg,data,intervals=intervals,max_length=max_length,histo_type=histo_type) for doc_neg in relevance[id_q]['irrelevant']])
             all_interaxion_4_query.append(neg)
             all_interaxion_4_query = np.array(all_interaxion_4_query)
             test_X[id_q] = all_interaxion_4_query
             np.save(folder_interaxion_np+id_q+histo_type+"_interractions.npy", all_interaxion_4_query)
             print(folder_interaxion_np+id_q+histo_type+"_interractions.npy succesfully saved.")
         else:
-            all_interaxion_4_query = np.load(folder_interaxion_np+id_q+histo_type+"_interractions.npy")
+            all_interaxion_4_query = np.load(folder_interaxion_np+id_q+histo_type+"_interractions.npy",allow_pickle=True)
             test_X[id_q] = all_interaxion_4_query
             print(folder_interaxion_np+id_q+histo_type+"_interractions.npy succesfully loaded.")
+    print("all interaction succesfully loaded/saved...")
     return train_X,test_X
 
 
@@ -201,7 +201,7 @@ if __name__ == "__main__":
     #relevance = data.load_relevance()
     #docs = data.load_all_docs()
     #query = data.load_all_query()
-    #que_emb = data.embedding_query()
+    data.embedding_query()
     #max_length = data.max_length_query
     #cosine_similarity(data.model_wv['car'].reshape(1,-1),data.model_wv['truck'].reshape(1,-1)).item()
     #hist = np.array([cosine_similarity(que_emb['301'][0].reshape(1,-1),data.model_wv[i].reshape(1,-1)).item() for i in docs['LA070389-0001']])
