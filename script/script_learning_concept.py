@@ -32,7 +32,7 @@ def load_all_path_docs_robust4(folder="/local/karmim/Stage_M1_RI/data/annotated_
 
 
 
-def load_all_query_annotated_robust4(file = '/local/karmim/Stage_M1_RI/data/topics-title.annotated.csv',pre_process=True,CUSTOM_FILTERS=[lambda x: x.lower(),remove_stopwords],delete_meaning=False):
+def load_all_query_annotated_robust4(file = '/local/karmim/Stage_M1_RI/data/topics-title.annotated.csv',pre_process=True,CUSTOM_FILTERS=[lambda x: x.lower(),remove_stopwords],delete_meaning=True):
     query_an = {} # Dict with words and concept for a query id
     concept = {} # Dict with only the concept for a query id
     f = codecs.open(file,'r',encoding='utf-8',errors='ignore')
