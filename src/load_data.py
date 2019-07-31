@@ -35,7 +35,7 @@ if not sys.warnoptions:
 
 class Dataset:
 
-    def __init__(self,load_all=True,w2v_model=False,CUSTOM_FILTERS = [lambda x: x.lower(),remove_stopwords,strip_numeric, strip_tags, strip_punctuation] ,embeddings_path="/local/karmim/Stage_M1_RI/data/vocab"):
+    def __init__(self,load_all=False,w2v_model=False,CUSTOM_FILTERS = [lambda x: x.lower(),remove_stopwords,strip_numeric, strip_tags, strip_punctuation] ,embeddings_path="/local/karmim/Stage_M1_RI/data/vocab"):
         """
             w2v_model : If use a word2vec model with gensim True else False 
             CUSTOM_FILTERS : list of filters use for the preprocessing 
@@ -358,7 +358,7 @@ class Dataset:
         if histo_type=='LCH':
             try:
                 cos = cosine_similarity(query,doc_emb)
-                mat_hist = np.log([np.histogram(cos[j],bins=intervals)[0] if (j < len(query)) \
+                mat_hist = np.log([np.histogram(cos[j],bins=intervals,range=(-1.0,1.0))[0] if (j < len(query)) \
                      else np.zeros((intervals,)) for j in range(self.max_length_query)])
                 mat_hist[mat_hist < 0] = 0
             except ValueError:
@@ -368,7 +368,7 @@ class Dataset:
         else:
             try:
                 cos = cosine_similarity(query,doc_emb)
-                mat_hist = np.array([np.histogram(cos[j],bins=intervals)[0] if j < len(query) \
+                mat_hist = np.array([np.histogram(cos[j],bins=intervals,range=(-1.0,1.0))[0] if j < len(query) \
                     else np.zeros((intervals,)) for j in range(self.max_length_query)]) 
                 
                 

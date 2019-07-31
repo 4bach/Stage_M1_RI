@@ -21,6 +21,9 @@ if not sys.warnoptions:
 
 
 if __name__ == "__main__":
+
+    """        FAST TEXT PRETRAINED NO CONCEPT          """
+
     data = load_data.Dataset(load_all=False,w2v_model=True,CUSTOM_FILTERS= [lambda x: x.lower(),remove_stopwords],embeddings_path="/local/karmim/Stage_M1_RI/data/object_python/concept_part/modelw2v/allRobustConcept2v.w2v")
     #relevance = data.load_relevance()
     docs = data.load_all_docs(doc_json="/local/karmim/Stage_M1_RI/data/object_python/concept_part/preprocess_doc.json")
@@ -32,5 +35,16 @@ if __name__ == "__main__":
     #ch = histo(que_emb['301'],'LA070389-0001',data)
     #lch = histo(que_emb['301'],'LA070389-0001',data,histo_type='LCH') # Work well for the DRMM architecture. 
     #nh = histo(que_emb['301'],'LA070389-0001',data,histo_type='NH') # Dont work really good in the original paper.
-    data.calcul_all_interaction_forNN(intervals = 30,histo_type='LCH',train_size=0.8,folder_interaction ="/local/karmim/Stage_M1_RI/data/object_python/interaction/all_robust/")
-    data.calcul_all_interaction_forNN(intervals = 30,histo_type='CH',train_size=0.8,folder_interaction ="/local/karmim/Stage_M1_RI/data/object_python/interaction/all_robust/")
+    data.calcul_all_interaction_forNN(intervals = 30,histo_type='LCH',train_size=0.8,folder_interaction ="/local/karmim/Stage_M1_RI/data/object_python/interaction/w2v_robust_all_concept/")
+    data.calcul_all_interaction_forNN(intervals = 30,histo_type='CH',train_size=0.8,folder_interaction ="/local/karmim/Stage_M1_RI/data/object_python/interaction/w2v_robust_all_concept/")
+
+
+
+    """        WORD2VEC TRAINED ON ROBUST4 WITH CONCEPT          """
+
+    data = load_data.Dataset(load_all=True,w2v_model=False)
+
+    data.calcul_all_interaction_forNN(intervals = 30,histo_type='LCH',train_size=0.8,\
+        folder_interaction ="/local/karmim/Stage_M1_RI/data/object_python/interaction/fast_text_no_concept/")
+    data.calcul_all_interaction_forNN(intervals = 30,histo_type='CH',train_size=0.8,\
+        folder_interaction ="/local/karmim/Stage_M1_RI/data/object_python/interaction/fast_text_no_concept/")
