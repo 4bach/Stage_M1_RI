@@ -22,8 +22,7 @@ if not sys.warnoptions:
 
 if __name__ == "__main__":
 
-    """        FAST TEXT PRETRAINED NO CONCEPT          """
-
+    """        WORD2VEC TRAINED ON ROBUST4 WITH CONCEPT          """
     data = load_data.Dataset(load_all=False,w2v_model=True,CUSTOM_FILTERS= [lambda x: x.lower(),remove_stopwords],embeddings_path="/local/karmim/Stage_M1_RI/data/object_python/concept_part/modelw2v/allRobustConcept2v.w2v")
     #relevance = data.load_relevance()
     docs = data.load_all_docs(doc_json="/local/karmim/Stage_M1_RI/data/object_python/concept_part/preprocess_doc.json")
@@ -40,7 +39,8 @@ if __name__ == "__main__":
 
 
 
-    """        WORD2VEC TRAINED ON ROBUST4 WITH CONCEPT          """
+    
+    """        FAST TEXT PRETRAINED NO CONCEPT          """
 
     data = load_data.Dataset(load_all=True,w2v_model=False)
 
