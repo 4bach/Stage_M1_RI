@@ -8,10 +8,17 @@ import pickle
 
 
 class Reranker:
-    def __init__(self, bm25_dict,histo_type='LCH',folder_interaction="/local/karmim/Stage_M1_RI/data/object_python/interaction/all_robust/"):
-        self.bm25_dict = bm25_dict #le dictionnaire query -> 2000 docs relevants pour bm25
+    def __init__(self, bm25_dict='/local/karmim/Stage_M1_RI/data/object_python/results_bm25_robust.pkl',histo_type='LCH',folder_interaction="/local/karmim/Stage_M1_RI/data/object_python/interaction/fast_text_no_concept/"):
+        if type(bm25_dict)==type(' '):
+            self.bm25_dict= pickle.load( open( bm25_dict, "rb" ) )
+        elif type(bm25_dict)==type({4:2}):
+            self.bm25_dict = bm25_dict #le dictionnaire query -> 2000 docs relevants pour bm25
+        else:
+            raise  ValueError('bm25_dict must be a path to a pickle file or a dictionnary.')
+
         self.folder_interaction=folder_interaction
         self.histo_type=histo_type
+
     def set_model(self, model):
         self.model = model
     
@@ -30,7 +37,7 @@ class Reranker:
             if id_requete != "634":
                 with torch.no_grad():
                     #contient une matrice (2000, query_max_len, hist_size)
-                    saintjeanlapuenta = np.load(self.folder_interaction+id_requete+self.histo_type+"_interractions.npy")
+                    saintjeanlapuenta = np.load(self.folder_interaction+id_requete+self.histo_type+"_interractions.npy",allow_pickle=True)
                     a = np.tile(np.array([query_idf[id_requete]]), (saintjeanlapuenta.shape[0],1))
 
                     model_scores = self.model(saintjeanlapuenta, a)
@@ -59,3 +66,11 @@ class Reranker:
         
         with open(res_file, "w") as tiacompris:
             tiacompris.write("\n".join(results))
+
+
+
+if __name__ == "__main__":
+
+    
+    reranker = Reranker(bm25_dict='/local/karmim/Stage_M1_RI/data/object_python/results_bm25_robust.pkl')
+    r=reranker.rerank()
